@@ -1,6 +1,9 @@
 import pool from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { FiltersBar } from "@/app/components/FiltersBar";
 import { Pagination } from "@/app/components/Pagination";
+import { LogoutButton } from "@/app/components/LogoutButton";
+import { LoginPrompt } from "@/app/components/LoginPrompt";
 import type {
   Make,
   Model,
@@ -10,7 +13,7 @@ import type {
   VehicleInterface,
 } from "@/app/components/FiltersBar";
 
-const PER_PAGE = 25;
+const PER_PAGE = 100;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,14 +24,11 @@ type VehicleRow = {
   year_display: string | null;
   make_name: string | null;
   model_name: string | null;
-  // model_notes: string | null;
   module_name: string | null;
   interface_names: string | null;
   obd_dlc_connect_cable: string | null;
   d2m_connect_cable: string | null;
   module_location: string | null;
-  // market: string | null;
-  // source_file: string | null;
 };
 
 type VehicleStringKey = Exclude<keyof VehicleRow, "id">;
@@ -133,7 +133,6 @@ async function getVehicles(
            my.display          AS year_display,
            mk.name             AS make_name,
            mo.name             AS model_name,
-           -- vl.model_notes,
            md.name             AS module_name,
            (SELECT string_agg(vi.name, ', ' ORDER BY vi.name)
             FROM   vehicles_interfaces vli
@@ -143,8 +142,6 @@ async function getVehicles(
            vl.obd_dlc_connect_cable,
            vl.d2m_connect_cable,
            vl.module_location
-           -- vl.market,
-           -- vl.source_file
          FROM  vehicles  vl
          LEFT  JOIN makes           mk ON mk.id = vl.make_id
          LEFT  JOIN models          mo ON mo.id = vl.model_id
@@ -181,14 +178,11 @@ const COLUMNS: { key: VehicleStringKey; label: string }[] = [
   { key: "year_display",          label: "Year" },
   { key: "make_name",             label: "Make" },
   { key: "model_name",            label: "Model" },
-  // { key: "model_notes",           label: "Notes" },
   { key: "module_name",           label: "Module" },
   { key: "interface_names",       label: "Interfaces" },
   { key: "obd_dlc_connect_cable", label: "OBD/DLC Cable" },
   { key: "d2m_connect_cable",     label: "D2M Cable" },
   { key: "module_location",       label: "Location" },
-  // { key: "market",                label: "Market" },
-  // { key: "source_file",           label: "Source File" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -201,6 +195,8 @@ export default async function Home({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const sp = await searchParams;
+  const session = await getSession();
+  const isAuthenticated = session !== null;
 
   const makeId     = typeof sp.make_id      === "string" ? Number(sp.make_id)      : undefined;
   const modelId    = typeof sp.model_id     === "string" ? Number(sp.model_id)     : undefined;
@@ -213,14 +209,18 @@ export default async function Home({
 
   const page = typeof sp.page === "string" ? Math.max(1, Number(sp.page)) : 1;
 
-  const [filterOptions, { rows: vehicles, total }] = await Promise.all([
-    getFilterOptions(),
-    getVehicles({ makeId, modelId, yearId, moduleId, interfaceIds }, page, PER_PAGE),
-  ]);
-
-  const totalPages = Math.ceil(total / PER_PAGE);
   const hasFilters =
     makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0);
+
+  const [filterOptions, vehicleResult] = await Promise.all([
+    getFilterOptions(),
+    isAuthenticated
+      ? getVehicles({ makeId, modelId, yearId, moduleId, interfaceIds }, page, PER_PAGE)
+      : Promise.resolve({ rows: [], total: 0 }),
+  ]);
+
+  const { rows: vehicles, total } = vehicleResult;
+  const totalPages = Math.ceil(total / PER_PAGE);
 
   const filterSearchParams: Record<string, string> = {};
   if (makeId)   filterSearchParams.make_id       = String(makeId);
@@ -232,20 +232,24 @@ export default async function Home({
 
   return (
     <div className="min-h-screen bg-zinc-50 p-8 dark:bg-zinc-950">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Vehicle Diagnostics Lookup
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {total > 0
-              ? `${total.toLocaleString()} record${total === 1 ? "" : "s"}${
-                  hasFilters ? " matching filters" : ""
-                }`
-              : hasFilters
-              ? "No records match these filters"
-              : "No records found"}
-          </p>
+      <div className="mx-auto max-w-8xl">
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+              Vehicle Diagnostics Lookup
+            </h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {isAuthenticated
+                ? total > 0
+                  ? `${total.toLocaleString()} record${total === 1 ? "" : "s"}${hasFilters ? " matching filters" : ""}`
+                  : hasFilters
+                  ? "No records match these filters"
+                  : "No records found"
+                : "Use the filters above to browse, then sign in to see results."}
+            </p>
+          </div>
+          {isAuthenticated && <LogoutButton />}
         </div>
 
         <FiltersBar
@@ -260,9 +264,12 @@ export default async function Home({
           currentYearId={yearId ?? null}
           currentModuleId={moduleId ?? null}
           currentInterfaceIds={interfaceIds ?? []}
+          isAuthenticated={isAuthenticated}
         />
 
-        {vehicles.length === 0 ? (
+        {!isAuthenticated ? (
+          <LoginPrompt />
+        ) : vehicles.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {hasFilters

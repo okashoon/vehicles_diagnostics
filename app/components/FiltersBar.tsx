@@ -26,6 +26,7 @@ export type FiltersBarProps = {
   currentYearId: number | null;
   currentModuleId: number | null;
   currentInterfaceIds: number[];
+  isAuthenticated: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -324,6 +325,7 @@ export function FiltersBar({
   currentYearId,
   currentModuleId,
   currentInterfaceIds,
+  isAuthenticated,
 }: FiltersBarProps) {
   const router = useRouter();
 
@@ -346,14 +348,14 @@ export function FiltersBar({
     if (yr !== null)       params.set("year_id",       String(yr));
     if (md !== null)       params.set("module_id",     String(md));
     if (ifaces.length > 0) params.set("interface_ids", ifaces.join(","));
-    router.push(`/?${params.toString()}`);
+    router.push(params.toString() ? `/?${params.toString()}` : "/");
   }
 
   function handleMakeChange(id: number | null) {
     setMakeId(id);
     setModelId(null);
     setYearId(null);
-    navigate(id, null, null, moduleId, interfaceIds);
+    if (isAuthenticated) navigate(id, null, null, moduleId, interfaceIds);
   }
 
   function handleModelChange(id: number | null) {
@@ -364,22 +366,22 @@ export function FiltersBar({
         : null;
     setModelId(id);
     setYearId(newYearId);
-    navigate(makeId, id, newYearId, moduleId, interfaceIds);
+    if (isAuthenticated) navigate(makeId, id, newYearId, moduleId, interfaceIds);
   }
 
   function handleYearChange(id: number | null) {
     setYearId(id);
-    navigate(makeId, modelId, id, moduleId, interfaceIds);
+    if (isAuthenticated) navigate(makeId, modelId, id, moduleId, interfaceIds);
   }
 
   function handleModuleChange(id: number | null) {
     setModuleId(id);
-    navigate(makeId, modelId, yearId, id, interfaceIds);
+    if (isAuthenticated) navigate(makeId, modelId, yearId, id, interfaceIds);
   }
 
   function handleInterfaceChange(ids: number[]) {
     setInterfaceIds(ids);
-    navigate(makeId, modelId, yearId, moduleId, ids);
+    if (isAuthenticated) navigate(makeId, modelId, yearId, moduleId, ids);
   }
 
   function handleClear() {
@@ -496,8 +498,8 @@ export function FiltersBar({
           />
         </div>
 
-        {/* Clear */}
-        {hasActiveFilters && (
+        {/* Clear (authenticated only) */}
+        {hasActiveFilters && isAuthenticated && (
           <div className="flex items-end">
             <button
               type="button"
