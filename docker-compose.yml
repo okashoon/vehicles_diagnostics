@@ -17,8 +17,6 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: ${DB_NAME:-vehicle_diagnostics}
       POSTGRES_USER: ${DB_USER:-postgres}
