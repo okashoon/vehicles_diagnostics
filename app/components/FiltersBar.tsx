@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
@@ -328,6 +328,7 @@ export function FiltersBar({
   isAuthenticated,
 }: FiltersBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [makeId, setMakeId]             = useState<number | null>(currentMakeId);
   const [modelId, setModelId]           = useState<number | null>(currentModelId);
@@ -348,7 +349,7 @@ export function FiltersBar({
     if (yr !== null)       params.set("year_id",       String(yr));
     if (md !== null)       params.set("module_id",     String(md));
     if (ifaces.length > 0) params.set("interface_ids", ifaces.join(","));
-    router.push(params.toString() ? `/?${params.toString()}` : "/");
+    router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname);
   }
 
   function handleMakeChange(id: number | null) {
@@ -390,7 +391,7 @@ export function FiltersBar({
     setYearId(null);
     setModuleId(null);
     setInterfaceIds([]);
-    router.push("/");
+    router.push(pathname);
   }
 
   const modelOptions = allModels
