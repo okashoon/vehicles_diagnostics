@@ -1,337 +1,227 @@
-import pool from "@/lib/db";
-import { getSession } from "@/lib/auth";
-import { FiltersBar } from "@/app/components/FiltersBar";
-import { Pagination } from "@/app/components/Pagination";
-import { LogoutButton } from "@/app/components/LogoutButton";
-import { LoginPrompt } from "@/app/components/LoginPrompt";
-import type {
-  Make,
-  Model,
-  ModelYearPair,
-  Year,
-  Module,
-  VehicleInterface,
-} from "@/app/components/FiltersBar";
+"use client";
 
-const PER_PAGE = 100;
+import { useState } from "react";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type VehicleRow = {
-  id: number;
-  year_display: string | null;
-  make_name: string | null;
-  model_name: string | null;
-  module_name: string | null;
-  interface_names: string | null;
-  obd_dlc_connect_cable: string | null;
-  d2m_connect_cable: string | null;
-  module_location: string | null;
-};
-
-type VehicleStringKey = Exclude<keyof VehicleRow, "id">;
-
-type FilterOptions = {
-  makes: Make[];
-  allModels: Model[];
-  years: Year[];
-  modelYearPairs: ModelYearPair[];
-  modules: Module[];
-  vehicleInterfaces: VehicleInterface[];
-};
-
-type VehicleResult = {
-  rows: VehicleRow[];
-  total: number;
-};
-
-// ---------------------------------------------------------------------------
-// Data fetching
-// ---------------------------------------------------------------------------
-
-async function getFilterOptions(): Promise<FilterOptions> {
-  try {
-    const [makesRes, modelsRes, yearsRes, pairsRes, modulesRes, interfacesRes] =
-      await Promise.all([
-        pool.query<Make>(`SELECT id, name FROM makes ORDER BY name`),
-        pool.query<Model>(`SELECT id, name, make_id FROM models ORDER BY name`),
-        pool.query<Year>(
-          `SELECT id, display FROM model_years ORDER BY year_start, year_end`
-        ),
-        pool.query<ModelYearPair>(
-          `SELECT DISTINCT model_id, model_year_id AS year_id
-           FROM vehicles
-           WHERE model_id IS NOT NULL AND model_year_id IS NOT NULL`
-        ),
-        pool.query<Module>(`SELECT id, name FROM modules ORDER BY name`),
-        pool.query<VehicleInterface>(
-          `SELECT id, name FROM vehicle_interfaces ORDER BY name`
-        ),
-      ]);
-    return {
-      makes: makesRes.rows,
-      allModels: modelsRes.rows,
-      years: yearsRes.rows,
-      modelYearPairs: pairsRes.rows,
-      modules: modulesRes.rows,
-      vehicleInterfaces: interfacesRes.rows,
-    };
-  } catch {
-    return {
-      makes: [],
-      allModels: [],
-      years: [],
-      modelYearPairs: [],
-      modules: [],
-      vehicleInterfaces: [],
-    };
-  }
-}
-
-async function getVehicles(
-  filters: {
-    makeId?: number;
-    modelId?: number;
-    yearId?: number;
-    moduleId?: number;
-    interfaceIds?: number[];
-  },
-  page: number,
-  perPage: number
-): Promise<VehicleResult> {
-  const { makeId, modelId, yearId, moduleId, interfaceIds } = filters;
-  const interfaceIdsParam =
-    interfaceIds && interfaceIds.length > 0 ? interfaceIds : null;
-
-  const filterParams = [
-    makeId ?? null,
-    modelId ?? null,
-    yearId ?? null,
-    moduleId ?? null,
-    interfaceIdsParam,
-  ];
-  const offset = (page - 1) * perPage;
-
-  const WHERE = `
-    WHERE ($1::int IS NULL OR vl.make_id       = $1)
-      AND ($2::int IS NULL OR vl.model_id      = $2)
-      AND ($3::int IS NULL OR vl.model_year_id = $3)
-      AND ($4::int IS NULL OR vl.module_id     = $4)
-      AND ($5::int[] IS NULL OR vl.id IN (
-            SELECT vehicle_id
-            FROM   vehicles_interfaces
-            WHERE  interface_id = ANY($5::int[])
-          ))`;
-
-  try {
-    const [rowsRes, countRes] = await Promise.all([
-      pool.query<VehicleRow>(
-        `SELECT
-           vl.id,
-           my.display          AS year_display,
-           mk.name             AS make_name,
-           mo.name             AS model_name,
-           md.name             AS module_name,
-           (SELECT string_agg(vi.name, ', ' ORDER BY vi.name)
-            FROM   vehicles_interfaces vli
-            JOIN   vehicle_interfaces vi ON vi.id = vli.interface_id
-            WHERE  vli.vehicle_id = vl.id
-           )                  AS interface_names,
-           vl.obd_dlc_connect_cable,
-           vl.d2m_connect_cable,
-           vl.module_location
-         FROM  vehicles  vl
-         LEFT  JOIN makes           mk ON mk.id = vl.make_id
-         LEFT  JOIN models          mo ON mo.id = vl.model_id
-         LEFT  JOIN model_years     my ON my.id = vl.model_year_id
-         LEFT  JOIN modules         md ON md.id = vl.module_id
-         ${WHERE}
-         ORDER BY vl.id
-         LIMIT $6 OFFSET $7`,
-        [...filterParams, perPage, offset]
-      ),
-      pool.query<{ total: number }>(
-        `SELECT COUNT(*)::int AS total
-         FROM vehicles vl
-         ${WHERE}`,
-        filterParams
-      ),
-    ]);
-
-    return {
-      rows: rowsRes.rows,
-      total: countRes.rows[0]?.total ?? 0,
-    };
-  } catch (err) {
-    console.error("Error getting vehicles", err);
-    return { rows: [], total: 0 };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Table columns
-// ---------------------------------------------------------------------------
-
-const COLUMNS: { key: VehicleStringKey; label: string }[] = [
-  { key: "year_display",          label: "Year" },
-  { key: "make_name",             label: "Make" },
-  { key: "model_name",            label: "Model" },
-  { key: "module_name",           label: "Module" },
-  { key: "interface_names",       label: "Interfaces" },
-  { key: "obd_dlc_connect_cable", label: "OBD/DLC Cable" },
-  { key: "d2m_connect_cable",     label: "D2M Cable" },
-  { key: "module_location",       label: "Location" },
-];
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const sp = await searchParams;
-  const session = await getSession();
-  const isAuthenticated = session !== null;
-
-  const makeId     = typeof sp.make_id      === "string" ? Number(sp.make_id)      : undefined;
-  const modelId    = typeof sp.model_id     === "string" ? Number(sp.model_id)     : undefined;
-  const yearId     = typeof sp.year_id      === "string" ? Number(sp.year_id)      : undefined;
-  const moduleId   = typeof sp.module_id    === "string" ? Number(sp.module_id)    : undefined;
-  const interfaceIds =
-    typeof sp.interface_ids === "string" && sp.interface_ids
-      ? sp.interface_ids.split(",").map(Number).filter((n) => !isNaN(n))
-      : undefined;
-
-  const page = typeof sp.page === "string" ? Math.max(1, Number(sp.page)) : 1;
-
-  const hasFilters =
-    makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0);
-
-  const [filterOptions, vehicleResult] = await Promise.all([
-    getFilterOptions(),
-    isAuthenticated
-      ? getVehicles({ makeId, modelId, yearId, moduleId, interfaceIds }, page, PER_PAGE)
-      : Promise.resolve({ rows: [], total: 0 }),
-  ]);
-
-  const { rows: vehicles, total } = vehicleResult;
-  const totalPages = Math.ceil(total / PER_PAGE);
-
-  const filterSearchParams: Record<string, string> = {};
-  if (makeId)   filterSearchParams.make_id       = String(makeId);
-  if (modelId)  filterSearchParams.model_id      = String(modelId);
-  if (yearId)   filterSearchParams.year_id       = String(yearId);
-  if (moduleId) filterSearchParams.module_id     = String(moduleId);
-  if (interfaceIds && interfaceIds.length > 0)
-    filterSearchParams.interface_ids = interfaceIds.join(",");
+export default function HomePage() {
+  const [activeTab, setActiveTab] = useState<"us" | "intl">("us");
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-8 dark:bg-zinc-950">
-      <div className="mx-auto max-w-8xl">
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Vehicle Diagnostics Lookup
-            </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {isAuthenticated
-                ? total > 0
-                  ? `${total.toLocaleString()} record${total === 1 ? "" : "s"}${hasFilters ? " matching filters" : ""}`
-                  : hasFilters
-                  ? "No records match these filters"
-                  : "No records found"
-                : "Use the filters above to browse, then sign in to see results."}
-            </p>
-          </div>
-          {isAuthenticated && <LogoutButton />}
+    <main className="min-h-screen bg-[#0a0e1a] text-white">
+
+      {/* ── Hero — video background ── */}
+      <section className="relative flex min-h-[60vh] items-center justify-center overflow-hidden">
+        {/* Background video */}
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          src="https://crashpulse.com/wp-content/uploads/2025/10/CDX-Video.mp4"
+          autoPlay
+          muted
+          playsInline
+          loop
+        />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/60" />
+
+        {/* Hero content */}
+        <div className="relative z-10 mx-auto max-w-3xl px-4 text-center">
+          <img
+            src="https://crashpulse.com/wp-content/uploads/2025/05/Crash-Pulse-1-1.png"
+            alt="Crash Pulse Technologies"
+            className="mx-auto mb-8 h-12 w-auto"
+          />
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-tight">
+            Crash Pulse Technologies
+          </h1>
+          <p className="mt-6 text-lg text-zinc-300 leading-relaxed max-w-2xl mx-auto">
+            The legacy tools were discontinued. The forensic engineering community was left without
+            a viable path forward.{" "}
+            <span className="text-white font-semibold">We built the solution.</span>
+          </p>
+        </div>
+      </section>
+
+      {/* ── Tab switcher ── */}
+      <section className="mx-auto max-w-5xl px-4 py-12">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-10">
+          <button
+            onClick={() => setActiveTab("us")}
+            className={[
+              "flex-1 sm:flex-none px-6 py-4 rounded-xl border-2 text-sm font-semibold transition-all duration-200",
+              activeTab === "us"
+                ? "border-[#e63946] bg-[#e63946]/10 text-white shadow-lg"
+                : "border-zinc-700 bg-[#111827] text-zinc-400 hover:border-zinc-500 hover:text-white",
+            ].join(" ")}
+          >
+            In the U.S.? You&apos;re in the Right Place.
+          </button>
+          <button
+            onClick={() => setActiveTab("intl")}
+            className={[
+              "flex-1 sm:flex-none px-6 py-4 rounded-xl border-2 text-sm font-semibold transition-all duration-200",
+              activeTab === "intl"
+                ? "border-[#e63946] bg-[#e63946]/10 text-white shadow-lg"
+                : "border-zinc-700 bg-[#111827] text-zinc-400 hover:border-zinc-500 hover:text-white",
+            ].join(" ")}
+          >
+            Outside the U.S.? We&apos;ve Got You Covered.
+          </button>
         </div>
 
-        <FiltersBar
-          makes={filterOptions.makes}
-          allModels={filterOptions.allModels}
-          years={filterOptions.years}
-          modelYearPairs={filterOptions.modelYearPairs}
-          modules={filterOptions.modules}
-          vehicleInterfaces={filterOptions.vehicleInterfaces}
-          currentMakeId={makeId ?? null}
-          currentModelId={modelId ?? null}
-          currentYearId={yearId ?? null}
-          currentModuleId={moduleId ?? null}
-          currentInterfaceIds={interfaceIds ?? []}
-          isAuthenticated={isAuthenticated}
-        />
-
-        {!isAuthenticated ? (
-          <LoginPrompt />
-        ) : vehicles.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {hasFilters
-                ? "No records match these filters."
-                : "No records found. Upload a CSV to get started."}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-                <thead className="bg-zinc-50 dark:bg-zinc-800/60">
-                  <tr>
-                    {COLUMNS.map((col) => (
-                      <th
-                        key={col.key}
-                        scope="col"
-                        className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
-                      >
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {vehicles.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                    >
-                      {COLUMNS.map((col) => {
-                        const value = row[col.key];
-                        return (
-                          <td
-                            key={col.key}
-                            className="max-w-xs truncate whitespace-nowrap px-4 py-3 text-zinc-700 dark:text-zinc-300"
-                            title={value ?? ""}
-                          >
-                            {value ?? (
-                              <span className="text-zinc-300 dark:text-zinc-600">
-                                &mdash;
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* ── US Tab ── */}
+        {activeTab === "us" && (
+          <div className="space-y-8">
+            <div className="text-center">
+              <a
+                href="https://crashpulseus.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#e63946] px-8 py-3 text-base font-bold text-white shadow-lg hover:bg-[#c1121f] transition-colors"
+              >
+                US Shop — Click Here
+              </a>
             </div>
 
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              total={total}
-              perPage={PER_PAGE}
-              searchParams={filterSearchParams}
-            />
+            <div className="rounded-2xl border border-zinc-800 bg-[#111827] p-8 space-y-6">
+              <h2 className="text-2xl font-extrabold text-white">Crash Pulse Technologies</h2>
+
+              <p className="text-zinc-300 leading-relaxed">
+                The legacy tools were discontinued. The forensic engineering community was left
+                without a viable path forward. We built the solution.
+              </p>
+
+              <p className="text-zinc-300 leading-relaxed">
+                We have secured a limited supply of discontinued components to produce a batch of
+                legacy-compatible VCIs designed to deliver equivalent crash data retrieval
+                functionality previously provided by the discontinued CANplus VCI, allowing
+                continued use of existing Bosch CDR software.
+              </p>
+
+              <p className="text-zinc-300 leading-relaxed">
+                With this limited release of CDX modules, the legacy gap is addressed. Supply chain
+                limitations are no longer the barrier they once were, and access to critical crash
+                data is restored for the forensic engineering community.
+              </p>
+
+              <p className="text-xl font-bold text-white italic text-center">
+                Unlocking the Past. Engineering the Future.
+              </p>
+
+              {/* Validation image — full width, centered */}
+              <img
+                src="https://crashpulse.com/wp-content/uploads/2026/03/Validation_Image.webp"
+                alt="Validation — SAE Published"
+                className="w-full rounded-xl"
+              />
+
+              {/* Summit image — full width, centered */}
+              <img
+                src="https://crashpulse.com/wp-content/uploads/2026/03/summit.webp"
+                alt="2026 EDR Summit — Houston"
+                className="w-full rounded-xl"
+              />
+
+              <div className="space-y-4 pt-2">
+                <p className="text-zinc-300 leading-relaxed">
+                  The Crash Pulse CDX was presented at the 2026 EDR Summit, in Houston, on the
+                  development and validation of the CDX, an SAE-published, functionally equivalent
+                  solution to the discontinued CANplus.
+                </p>
+
+                <p className="text-white font-semibold">Topics included:</p>
+                <ul className="space-y-1.5">
+                  {[
+                    "Building the CDX",
+                    "Beta testing",
+                    "Validation testing",
+                    "SAE Technical Paper",
+                    "Upcoming ARJ Technical Paper",
+                    "Seamless compatibility with the CDR ecosystem",
+                    "Software",
+                    "Cables",
+                    "Adapters",
+                    "CDX Programmer's Edition",
+                    "Extensive QA/QC process and 3-year warranty",
+                    "Solved – Nissan: Double Ignition Cycle Anomaly Explained",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-zinc-300 text-sm">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#e63946]" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
         )}
-      </div>
-    </div>
+
+        {/* ── International Tab ── */}
+        {activeTab === "intl" && (
+          <div className="space-y-8">
+            <div className="text-center">
+              <a
+                href="https://crashpulseglobal.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#e63946] px-8 py-3 text-base font-bold text-white shadow-lg hover:bg-[#c1121f] transition-colors"
+              >
+                International Shop — Click Here
+              </a>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-[#111827] p-8 space-y-5">
+              <p className="text-zinc-300 leading-relaxed">
+                Global pre-orders will be live soon at CrashPulseGLOBAL.com. This is the only way
+                to lock in your CDX unit before they&apos;re gone. Please visit our International
+                Shop and add your email address to be notified as soon as international CDX units
+                are ready to ship!
+              </p>
+
+              <p className="text-zinc-300 leading-relaxed">
+                <strong className="text-white">CrashPulseGLOBAL.com</strong> is the official store
+                for all international orders. Serving forensic engineers, crash reconstructionists,
+                and investigative teams across Europe, Australia, United Kingdom, and beyond.
+              </p>
+
+              <p className="text-zinc-300 leading-relaxed">
+                We ship globally from our European distribution center, so you can avoid U.S.
+                export hassles, steep customs fees, and unnecessary delays.
+              </p>
+
+              <div>
+                <p className="text-white font-semibold mb-3">
+                  On CrashPulseGLOBAL.com you&apos;ll find:
+                </p>
+                <ul className="space-y-2">
+                  {[
+                    "The CDX Vehicle Communication Interface — a rugged, field-ready tool built to support legacy crash data workflows in a wide range of global vehicles",
+                    "Complete eXtraction Kits — includes precision-engineered cables and adapters that streamline your data access",
+                    "Localized Checkout Options — major currencies, secure payments, VAT-friendly B2B transactions",
+                    "Fast Global Shipping — trusted couriers, real-time tracking, no surprises",
+                    "Built for Investigators, by Investigators — we know what matters in the field, because we've worked it",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5 text-zinc-300 text-sm">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#e63946]" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="text-zinc-300 leading-relaxed">
+                Whether you&apos;re running investigations in Ireland, Germany, Sydney, or anywhere
+                in between, CrashPulseGLOBAL.com makes it simple to get the tools you need, with
+                support that speaks your language.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <footer className="border-t border-zinc-800 bg-[#080b14] py-8 text-center">
+        <p className="text-sm text-zinc-500">
+          &copy; {new Date().getFullYear()} Crash Pulse Technologies. All Rights Reserved.
+        </p>
+      </footer>
+    </main>
   );
 }
