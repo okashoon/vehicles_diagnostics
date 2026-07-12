@@ -1,9 +1,9 @@
-import { NavBarV3 } from "@/app/v3/components/NavBar";
+import { NavBar } from "@/app/components/NavBar";
 
-export default function V3Layout({ children }: { children: React.ReactNode }) {
+export default function V1Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <NavBarV3 />
+      <NavBar />
       {children}
     </>
   );

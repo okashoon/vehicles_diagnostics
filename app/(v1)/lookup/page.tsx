@@ -15,10 +15,6 @@ import type {
 
 const PER_PAGE = 100;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type VehicleRow = {
   id: number;
   year_display: string | null;
@@ -42,14 +38,7 @@ type FilterOptions = {
   vehicleInterfaces: VehicleInterface[];
 };
 
-type VehicleResult = {
-  rows: VehicleRow[];
-  total: number;
-};
-
-// ---------------------------------------------------------------------------
-// Data fetching
-// ---------------------------------------------------------------------------
+type VehicleResult = { rows: VehicleRow[]; total: number };
 
 async function getFilterOptions(): Promise<FilterOptions> {
   try {
@@ -57,18 +46,14 @@ async function getFilterOptions(): Promise<FilterOptions> {
       await Promise.all([
         pool.query<Make>(`SELECT id, name FROM makes ORDER BY name`),
         pool.query<Model>(`SELECT id, name, make_id FROM models ORDER BY name`),
-        pool.query<Year>(
-          `SELECT id, display FROM model_years ORDER BY year_start, year_end`
-        ),
+        pool.query<Year>(`SELECT id, display FROM model_years ORDER BY year_start, year_end`),
         pool.query<ModelYearPair>(
           `SELECT DISTINCT model_id, model_year_id AS year_id
            FROM vehicles
            WHERE model_id IS NOT NULL AND model_year_id IS NOT NULL`
         ),
         pool.query<Module>(`SELECT id, name FROM modules ORDER BY name`),
-        pool.query<VehicleInterface>(
-          `SELECT id, name FROM vehicle_interfaces ORDER BY name`
-        ),
+        pool.query<VehicleInterface>(`SELECT id, name FROM vehicle_interfaces ORDER BY name`),
       ]);
     return {
       makes: makesRes.rows,
@@ -79,39 +64,18 @@ async function getFilterOptions(): Promise<FilterOptions> {
       vehicleInterfaces: interfacesRes.rows,
     };
   } catch {
-    return {
-      makes: [],
-      allModels: [],
-      years: [],
-      modelYearPairs: [],
-      modules: [],
-      vehicleInterfaces: [],
-    };
+    return { makes: [], allModels: [], years: [], modelYearPairs: [], modules: [], vehicleInterfaces: [] };
   }
 }
 
 async function getVehicles(
-  filters: {
-    makeId?: number;
-    modelId?: number;
-    yearId?: number;
-    moduleId?: number;
-    interfaceIds?: number[];
-  },
+  filters: { makeId?: number; modelId?: number; yearId?: number; moduleId?: number; interfaceIds?: number[] },
   page: number,
   perPage: number
 ): Promise<VehicleResult> {
   const { makeId, modelId, yearId, moduleId, interfaceIds } = filters;
-  const interfaceIdsParam =
-    interfaceIds && interfaceIds.length > 0 ? interfaceIds : null;
-
-  const filterParams = [
-    makeId ?? null,
-    modelId ?? null,
-    yearId ?? null,
-    moduleId ?? null,
-    interfaceIdsParam,
-  ];
+  const interfaceIdsParam = interfaceIds && interfaceIds.length > 0 ? interfaceIds : null;
+  const filterParams = [makeId ?? null, modelId ?? null, yearId ?? null, moduleId ?? null, interfaceIdsParam];
   const offset = (page - 1) * perPage;
 
   const WHERE = `
@@ -120,9 +84,7 @@ async function getVehicles(
       AND ($3::int IS NULL OR vl.model_year_id = $3)
       AND ($4::int IS NULL OR vl.module_id     = $4)
       AND ($5::int[] IS NULL OR vl.id IN (
-            SELECT vehicle_id
-            FROM   vehicles_interfaces
-            WHERE  interface_id = ANY($5::int[])
+            SELECT vehicle_id FROM vehicles_interfaces WHERE interface_id = ANY($5::int[])
           ))`;
 
   try {
@@ -152,44 +114,27 @@ async function getVehicles(
          LIMIT $6 OFFSET $7`,
         [...filterParams, perPage, offset]
       ),
-      pool.query<{ total: number }>(
-        `SELECT COUNT(*)::int AS total
-         FROM vehicles vl
-         ${WHERE}`,
-        filterParams
-      ),
+      pool.query<{ total: number }>(`SELECT COUNT(*)::int AS total FROM vehicles vl ${WHERE}`, filterParams),
     ]);
-
-    return {
-      rows: rowsRes.rows,
-      total: countRes.rows[0]?.total ?? 0,
-    };
+    return { rows: rowsRes.rows, total: countRes.rows[0]?.total ?? 0 };
   } catch (err) {
     console.error("Error getting vehicles", err);
     return { rows: [], total: 0 };
   }
 }
 
-// ---------------------------------------------------------------------------
-// Table columns
-// ---------------------------------------------------------------------------
-
 const COLUMNS: { key: VehicleStringKey; label: string }[] = [
-  { key: "year_display",          label: "Year" },
-  { key: "make_name",             label: "Make" },
-  { key: "model_name",            label: "Model" },
-  { key: "module_name",           label: "Module" },
-  { key: "interface_names",       label: "Interfaces" },
-  { key: "obd_dlc_connect_cable", label: "OBD/DLC Cable" },
-  { key: "d2m_connect_cable",     label: "D2M Cable" },
-  { key: "module_location",       label: "Location" },
+  { key: "year_display",          label: "YEAR" },
+  { key: "make_name",             label: "MAKE" },
+  { key: "model_name",            label: "MODEL" },
+  { key: "module_name",           label: "MODULE" },
+  { key: "interface_names",       label: "INTERFACES" },
+  { key: "obd_dlc_connect_cable", label: "OBD/DLC_CABLE" },
+  { key: "d2m_connect_cable",     label: "D2M_CABLE" },
+  { key: "module_location",       label: "LOCATION" },
 ];
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-export default async function LookupPage({
+export default async function LookupV3({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -198,19 +143,17 @@ export default async function LookupPage({
   const session = await getSession();
   const isAuthenticated = session !== null;
 
-  const makeId     = typeof sp.make_id      === "string" ? Number(sp.make_id)      : undefined;
-  const modelId    = typeof sp.model_id     === "string" ? Number(sp.model_id)     : undefined;
-  const yearId     = typeof sp.year_id      === "string" ? Number(sp.year_id)      : undefined;
-  const moduleId   = typeof sp.module_id    === "string" ? Number(sp.module_id)    : undefined;
+  const makeId      = typeof sp.make_id      === "string" ? Number(sp.make_id)      : undefined;
+  const modelId     = typeof sp.model_id     === "string" ? Number(sp.model_id)     : undefined;
+  const yearId      = typeof sp.year_id      === "string" ? Number(sp.year_id)      : undefined;
+  const moduleId    = typeof sp.module_id    === "string" ? Number(sp.module_id)    : undefined;
   const interfaceIds =
     typeof sp.interface_ids === "string" && sp.interface_ids
       ? sp.interface_ids.split(",").map(Number).filter((n) => !isNaN(n))
       : undefined;
 
   const page = typeof sp.page === "string" ? Math.max(1, Number(sp.page)) : 1;
-
-  const hasFilters =
-    makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0);
+  const hasFilters = makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0);
 
   const [filterOptions, vehicleResult] = await Promise.all([
     getFilterOptions(),
@@ -231,22 +174,23 @@ export default async function LookupPage({
     filterSearchParams.interface_ids = interfaceIds.join(",");
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-8 dark:bg-zinc-950">
+    <div className="min-h-screen bg-[#0a0a0a] p-8 font-mono text-[#e0ffe0]">
       <div className="mx-auto max-w-8xl">
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="mb-8 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            <p className="text-xs tracking-[0.3em] text-[#00ff41]/50 mb-2">// DATABASE_QUERY</p>
+            <h1 className="text-xl font-bold tracking-widest text-[#00ff41] uppercase">
               Vehicle Diagnostics Lookup
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-[#00cc33]/60 tracking-wide">
               {isAuthenticated
                 ? total > 0
-                  ? `${total.toLocaleString()} record${total === 1 ? "" : "s"}${hasFilters ? " matching filters" : ""}`
+                  ? `&gt; ${total.toLocaleString()} RECORD${total === 1 ? "" : "S"}${hasFilters ? " MATCHING FILTERS" : " LOADED"}`
                   : hasFilters
-                  ? "No records match these filters"
-                  : "No records found"
-                : "Use the filters above to browse, then sign in to see results."}
+                  ? "&gt; NO RECORDS MATCH FILTERS"
+                  : "&gt; NO RECORDS FOUND"
+                : "&gt; AUTHENTICATION REQUIRED — APPLY FILTERS THEN SIGN IN"}
             </p>
           </div>
           {isAuthenticated && <LogoutButton />}
@@ -270,49 +214,40 @@ export default async function LookupPage({
         {!isAuthenticated ? (
           <LoginPrompt />
         ) : vehicles.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-white py-16 text-center dark:border-zinc-700 dark:bg-zinc-900">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {hasFilters
-                ? "No records match these filters."
-                : "No records found. Upload a CSV to get started."}
+          <div className="border border-dashed border-[#00ff41]/20 bg-[#111111] py-16 text-center">
+            <p className="text-sm text-[#00cc33]/60 font-mono tracking-widest">
+              {hasFilters ? "&gt; NO RECORDS MATCH FILTERS" : "&gt; NO RECORDS FOUND"}
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="overflow-hidden border border-[#00ff41]/30 bg-[#111111]">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-                <thead className="bg-zinc-50 dark:bg-zinc-800/60">
+              <table className="min-w-full divide-y divide-[#00ff41]/10 text-xs">
+                <thead className="bg-[#0a0a0a]">
                   <tr>
                     {COLUMNS.map((col) => (
                       <th
                         key={col.key}
                         scope="col"
-                        className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400"
+                        className="whitespace-nowrap px-4 py-3 text-left font-mono font-bold tracking-widest text-[#00ff41]/60 uppercase text-[10px]"
                       >
                         {col.label}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tbody className="divide-y divide-[#00ff41]/10">
                   {vehicles.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                    >
+                    <tr key={row.id} className="transition-colors hover:bg-[#00ff41]/5">
                       {COLUMNS.map((col) => {
                         const value = row[col.key];
                         return (
                           <td
                             key={col.key}
-                            className="max-w-xs truncate whitespace-nowrap px-4 py-3 text-zinc-700 dark:text-zinc-300"
+                            className="max-w-xs truncate whitespace-nowrap px-4 py-2.5 text-[#00cc33] font-mono"
                             title={value ?? ""}
                           >
-                            {value ?? (
-                              <span className="text-zinc-300 dark:text-zinc-600">
-                                &mdash;
-                              </span>
-                            )}
+                            {value ?? <span className="text-[#00ff41]/20">—</span>}
                           </td>
                         );
                       })}
@@ -321,7 +256,6 @@ export default async function LookupPage({
                 </tbody>
               </table>
             </div>
-
             <Pagination
               page={page}
               totalPages={totalPages}

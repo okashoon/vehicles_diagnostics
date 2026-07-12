@@ -18,36 +18,40 @@ const IMAGES = [
   "https://crashpulse.com/wp-content/uploads/2026/03/IMG_2250.jpg",
 ];
 
-export default function GalleryPage() {
+export default function GalleryV3() {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const currentIndex = lightbox ? IMAGES.indexOf(lightbox) : -1;
 
-  function prev() {
-    if (currentIndex > 0) setLightbox(IMAGES[currentIndex - 1]);
-  }
-
-  function next() {
-    if (currentIndex < IMAGES.length - 1) setLightbox(IMAGES[currentIndex + 1]);
-  }
+  function prev() { if (currentIndex > 0) setLightbox(IMAGES[currentIndex - 1]); }
+  function next() { if (currentIndex < IMAGES.length - 1) setLightbox(IMAGES[currentIndex + 1]); }
 
   return (
-    <main className="min-h-screen bg-[#0a0e1a] text-white">
+    <main className="min-h-screen bg-[#0a0a0a] text-[#e0ffe0] font-mono">
       <section className="mx-auto max-w-6xl px-4 py-16">
-        <h1 className="text-3xl font-extrabold text-white mb-10">Gallery</h1>
+        <div className="mb-10">
+          <p className="text-xs tracking-[0.3em] text-[#00ff41]/50 mb-2">// VISUAL_ARCHIVE</p>
+          <h1 className="text-2xl font-black tracking-widest text-[#00ff41] uppercase">Gallery</h1>
+        </div>
 
-        <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 space-y-3">
+        <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 space-y-2">
           {IMAGES.map((src, i) => (
             <button
               key={src}
               onClick={() => setLightbox(src)}
-              className="block w-full break-inside-avoid overflow-hidden rounded-xl border border-zinc-800 hover:border-[#e63946]/60 transition-colors focus:outline-none focus:ring-2 focus:ring-[#e63946]/50 group"
+              className="block w-full break-inside-avoid overflow-hidden border border-[#00ff41]/20 hover:border-[#00ff41] transition-colors focus:outline-none focus:ring-1 focus:ring-[#00ff41]/50 group"
             >
-              <img
-                src={src}
-                alt={`Gallery image ${i + 1}`}
-                className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-              />
+              <div className="relative">
+                <img
+                  src={src}
+                  alt={`Gallery image ${i + 1}`}
+                  className="w-full h-auto object-cover transition-all duration-300 group-hover:opacity-80"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-[#00ff41]/0 group-hover:bg-[#00ff41]/10 transition-colors" />
+                <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#0a0a0a]/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end pb-1 px-2">
+                  <span className="text-[9px] font-mono text-[#00ff41]">IMG_{String(i + 1).padStart(3, "0")}</span>
+                </div>
+              </div>
             </button>
           ))}
         </div>
@@ -56,61 +60,51 @@ export default function GalleryPage() {
       {/* Lightbox */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a]/95 p-4"
           onClick={() => setLightbox(null)}
         >
-          {/* Prev */}
           <button
             onClick={(e) => { e.stopPropagation(); prev(); }}
             disabled={currentIndex === 0}
-            className="absolute left-4 sm:left-8 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="absolute left-4 sm:left-8 flex h-12 w-12 items-center justify-center border border-[#00ff41]/40 bg-[#111111] text-[#00ff41] font-mono text-sm hover:border-[#00ff41] hover:bg-[#00ff41]/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            &lt;
           </button>
 
-          {/* Image */}
-          <div
-            className="relative max-w-5xl w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={lightbox}
-              alt="Gallery"
-              className="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
-            />
-            <p className="mt-2 text-center text-xs text-zinc-500">
-              {currentIndex + 1} / {IMAGES.length}
-            </p>
+          <div className="relative max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border border-[#00ff41]/30 bg-[#111111] p-1">
+              <div className="border-b border-[#00ff41]/20 px-3 py-1 flex items-center gap-2 mb-1">
+                <span className="text-[#00ff41] text-xs font-mono">IMG_{String(currentIndex + 1).padStart(3, "0")}</span>
+                <span className="text-[#00ff41]/40 text-xs font-mono ml-auto">{currentIndex + 1} / {IMAGES.length}</span>
+              </div>
+              <img
+                src={lightbox}
+                alt="Gallery"
+                className="w-full max-h-[80vh] object-contain"
+              />
+            </div>
           </div>
 
-          {/* Next */}
           <button
             onClick={(e) => { e.stopPropagation(); next(); }}
             disabled={currentIndex === IMAGES.length - 1}
-            className="absolute right-4 sm:right-8 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="absolute right-4 sm:right-8 flex h-12 w-12 items-center justify-center border border-[#00ff41]/40 bg-[#111111] text-[#00ff41] font-mono text-sm hover:border-[#00ff41] hover:bg-[#00ff41]/10 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            &gt;
           </button>
 
-          {/* Close */}
           <button
             onClick={() => setLightbox(null)}
-            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-[#e63946] transition-colors"
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center border border-[#00ff41]/40 bg-[#111111] text-[#00ff41] font-mono text-xs hover:border-[#00ff41] hover:bg-[#00ff41]/10 transition-colors"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            [X]
           </button>
         </div>
       )}
 
-      <footer className="border-t border-zinc-800 bg-[#080b14] py-8 text-center">
-        <p className="text-sm text-zinc-500">
-          &copy; {new Date().getFullYear()} Crash Pulse Technologies. All Rights Reserved.
+      <footer className="border-t border-[#00ff41]/20 py-8 text-center">
+        <p className="text-xs font-mono text-[#00ff41]/30 tracking-widest">
+          &copy; {new Date().getFullYear()} CRASH_PULSE_TECHNOLOGIES :: ALL_RIGHTS_RESERVED
         </p>
       </footer>
     </main>

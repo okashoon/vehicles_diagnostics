@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const NAV_LINKS = [
-  { label: "HOME", href: "/v3" },
-  { label: "ABOUT", href: "/v3/about" },
-  { label: "GALLERY", href: "/v3/gallery" },
-  { label: "VALIDATION", href: "/v3/validation" },
-  { label: "CONTACT", href: "/v3/contact" },
-  { label: "INNOVATE", href: "/v3/innovate" },
-  { label: "SETUP", href: "/v3/setup-guide" },
-  { label: "LOOKUP", href: "/v3/lookup" },
+  { label: "HOME", href: "/" },
+  { label: "VALIDATION", href: "/validation" },
+  { label: "ABOUT", href: "/about" },
+  { label: "GALLERY", href: "/gallery" },
+  { label: "CONTACT", href: "/contact" },
+  { label: "INNOVATE", href: "/innovate" },
+  // { label: "SETUP", href: "/setup-guide" },
+  { label: "LOOKUP", href: "/lookup" },
 ];
 
 export function NavBarV3() {
@@ -24,8 +24,12 @@ export function NavBarV3() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/v3" className="shrink-0 font-mono text-sm font-bold text-[#00ff41] tracking-widest">
-            &gt;_ CRASH<span className="text-[#e0ffe0]">PULSE</span>
+          <Link href="/" className="shrink-0">
+            <img
+              src="/crush_pulse_logo.jpeg"
+              alt="Crash Pulse Technologies"
+              className="h-12 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop nav */}
