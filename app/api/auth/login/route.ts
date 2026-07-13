@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await pool.query(
-      "SELECT id, password_hash FROM users WHERE email = $1",
+      `SELECT id, password_hash, email_verified, provider
+       FROM users WHERE email = $1`,
       [email.trim().toLowerCase()]
     );
 
@@ -26,11 +27,31 @@ export async function POST(req: NextRequest) {
     }
 
     const user = result.rows[0];
+
+    // Google-only account — no password set
+    if (user.provider === "google" || !user.password_hash) {
+      return NextResponse.json(
+        { error: "This account uses Google sign-in. Click 'Sign in with Google' below." },
+        { status: 401 }
+      );
+    }
+
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 401 }
+      );
+    }
+
+    // Block unverified accounts
+    if (!user.email_verified) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before signing in. Check your inbox for the verification link.",
+          unverified: true,
+        },
+        { status: 403 }
       );
     }
 

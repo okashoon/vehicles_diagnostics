@@ -33,6 +33,14 @@ export function verifyPassword(
 }
 
 // ---------------------------------------------------------------------------
+// Verification tokens
+// ---------------------------------------------------------------------------
+
+export function createVerificationToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+// ---------------------------------------------------------------------------
 // Session tokens (signed, base64url-encoded JSON + HMAC)
 // ---------------------------------------------------------------------------
 
@@ -63,12 +71,28 @@ export function verifySessionToken(token: string): { userId: number } | null {
 }
 
 // ---------------------------------------------------------------------------
-// Server-side session reader
+// Server-side session reader — checks custom cookie then NextAuth JWT
 // ---------------------------------------------------------------------------
 
 export async function getSession(): Promise<{ userId: number } | null> {
+  // 1. Custom cookie (email/password logins)
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySessionToken(token);
+  if (token) {
+    const result = verifySessionToken(token);
+    if (result) return result;
+  }
+
+  // 2. NextAuth JWT session (Google OAuth logins)
+  try {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/lib/auth-options");
+    const session = await getServerSession(authOptions);
+    const userId = (session as { userId?: number } | null)?.userId;
+    if (typeof userId === "number") return { userId };
+  } catch {
+    // NextAuth unavailable — skip silently
+  }
+
+  return null;
 }
