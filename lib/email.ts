@@ -1,13 +1,14 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = "onboarding@resend.dev";
-const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+const FROM = "noreply@crashpulse.com";
 
 export async function sendVerificationEmail(
   email: string,
   token: string
 ): Promise<void> {
+  // Lazy init — runs at request time, not build time
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const verifyUrl = `${BASE_URL}/api/auth/verify?token=${token}`;
 
   await resend.emails.send({
