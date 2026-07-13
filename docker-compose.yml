@@ -4,6 +4,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     environment:
       DB_HOST: db
       DB_PORT: 5432
