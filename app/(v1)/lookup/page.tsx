@@ -2,7 +2,6 @@ import pool from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { FiltersBar } from "@/app/components/FiltersBar";
 import { Pagination } from "@/app/components/Pagination";
-import { LogoutButton } from "@/app/components/LogoutButton";
 import { LoginPrompt } from "@/app/components/LoginPrompt";
 import type {
   Make,
@@ -193,7 +192,6 @@ export default async function LookupV3({
                 : "&gt; AUTHENTICATION REQUIRED — APPLY FILTERS THEN SIGN IN"}
             </p>
           </div>
-          {isAuthenticated && <LogoutButton />}
         </div>
 
         <FiltersBar

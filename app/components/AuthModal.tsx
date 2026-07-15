@@ -74,6 +74,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
         return;
       }
 
+      window.dispatchEvent(new Event("auth-change"));
       onSuccess();
     } catch {
       setError("Network error. Please try again.");

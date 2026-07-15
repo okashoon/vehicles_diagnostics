@@ -24,19 +24,24 @@ export function NavBarV3() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [me, setMe] = useState<Me>(undefined as unknown as Me);
 
-  useEffect(() => {
+  function refetchMe() {
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((data) => setMe(data))
       .catch(() => setMe(null));
+  }
+
+  useEffect(() => {
+    refetchMe();
+    window.addEventListener("auth-change", refetchMe);
+    return () => window.removeEventListener("auth-change", refetchMe);
   }, []);
 
   async function handleSignOut() {
-    // Clear custom cookie session
     await fetch("/api/auth/logout", { method: "POST" });
-    // Clear NextAuth JWT (Google OAuth) — redirects to "/" by default
     await signOut({ redirect: false });
-    router.refresh();
+    setMe(null);
+    window.dispatchEvent(new Event("auth-change"));
     router.push("/");
   }
 
