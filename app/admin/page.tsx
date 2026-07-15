@@ -43,6 +43,7 @@ interface ContactEmail {
   id: string;
   subject: string;
   to: string[] | null;
+  reply_to: string[] | null;
   created_at: string;
   sent_at: string | null;
   status: string;
@@ -55,7 +56,7 @@ async function getContactEmails(): Promise<ContactEmail[]> {
     const { data, error } = await resend.emails.list();
     if (error || !data) return [];
     return (data.data as unknown as ContactEmail[]).filter(e =>
-      e.subject?.startsWith("New contact from")
+      e.subject?.startsWith("New contact from") && !e.reply_to?.[0]?.includes("okashoon") &&!e.reply_to?.[0]?.includes("a.okasha")
     );
   } catch {
     return [];
@@ -275,7 +276,7 @@ export default async function AdminPage({
                 {contactEmails.map(email => (
                   <tr key={email.id} className="hover:bg-gray-800/40 transition-colors">
                     <td className="px-5 py-3 text-gray-300 text-xs font-mono">
-                      {email.to?.[0] ?? "—"}
+                      {email.reply_to?.[0] ?? "—"}
                     </td>
                     <td className="px-5 py-3 text-gray-100 text-sm">
                       {email.subject}
