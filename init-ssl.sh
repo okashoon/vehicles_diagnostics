@@ -4,14 +4,18 @@
 #
 # Usage:
 #   chmod +x init-ssl.sh
-#   ./init-ssl.sh your-domain.com your@email.com
+#   ./init-ssl.sh crashpulse.brighter-buds.com your@email.com
 
 set -e
 
 DOMAIN=${1:?Usage: ./init-ssl.sh <domain> <email>}
 EMAIL=${2:?Usage: ./init-ssl.sh <domain> <email>}
+WWW_DOMAIN="www.$DOMAIN"
 
-echo "==> Replacing YOUR_DOMAIN with $DOMAIN in nginx.conf"
+echo "==> Configuring nginx for $DOMAIN and $WWW_DOMAIN"
+# YOUR_SERVER_NAMES → both domains (for server_name directive)
+sed -i "s/YOUR_SERVER_NAMES/$DOMAIN $WWW_DOMAIN/g" nginx/nginx.conf
+# YOUR_DOMAIN → primary domain only (for cert file paths)
 sed -i "s/YOUR_DOMAIN/$DOMAIN/g" nginx/nginx.conf
 
 echo "==> Creating dummy self-signed cert so nginx can start"
@@ -27,14 +31,15 @@ docker compose up -d nginx
 echo "==> Removing dummy cert"
 rm -rf ./certbot/conf/live
 
-echo "==> Issuing real Let's Encrypt certificate"
+echo "==> Issuing real Let's Encrypt certificate for $DOMAIN and $WWW_DOMAIN"
 docker compose run --rm certbot certonly \
   --webroot \
   --webroot-path=/var/www/certbot \
   --email "$EMAIL" \
   --agree-tos \
   --no-eff-email \
-  -d "$DOMAIN"
+  -d "$DOMAIN" \
+  -d "$WWW_DOMAIN"
 
 echo "==> Reloading nginx with real cert"
 docker compose exec nginx nginx -s reload
@@ -43,5 +48,8 @@ echo "==> Starting all services"
 docker compose up -d
 
 echo ""
-echo "Done! Your site is live at https://$DOMAIN"
+echo "Done! Your site is live at:"
+echo "  https://$DOMAIN"
+echo "  https://$WWW_DOMAIN"
+echo ""
 echo "Remember to update NEXTAUTH_URL=https://$DOMAIN in .env.local"
