@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const FROM = "noreply@crashpulse.com";
+const FROM = "onboarding@resend.dev";
 
 export async function sendVerificationEmail(
   email: string,
