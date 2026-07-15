@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import pool from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { Resend } from "resend";
 
 interface UserRow {
   id: number;
@@ -38,6 +39,29 @@ function formatDate(iso: string | null) {
   });
 }
 
+interface ContactEmail {
+  id: string;
+  subject: string;
+  to: string[] | null;
+  created_at: string;
+  sent_at: string | null;
+  status: string;
+}
+
+async function getContactEmails(): Promise<ContactEmail[]> {
+  if (!process.env.RESEND_API_KEY) return [];
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { data, error } = await resend.emails.list();
+    if (error || !data) return [];
+    return (data.data as unknown as ContactEmail[]).filter(e =>
+      e.subject?.startsWith("New contact from")
+    );
+  } catch {
+    return [];
+  }
+}
+
 function applyFilter(users: UserRow[], filter: Filter): UserRow[] {
   if (filter === "verified") return users.filter(u => u.email_verified);
   if (filter === "google")   return users.filter(u => u.provider === "google");
@@ -61,7 +85,10 @@ export default async function AdminPage({
     ? rawFilter
     : null) as Filter;
 
-  const allUsers = await getAllUsers();
+  const [allUsers, contactEmails] = await Promise.all([
+    getAllUsers(),
+    getContactEmails(),
+  ]);
   const filteredUsers = applyFilter(allUsers, filter);
 
   const verified    = allUsers.filter(u => u.email_verified).length;
@@ -212,6 +239,56 @@ export default async function AdminPage({
                   <tr>
                     <td colSpan={8} className="px-5 py-10 text-center text-gray-600">
                       No users match this filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Contact messages */}
+        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+              Contact Messages ({contactEmails.length})
+            </h2>
+            <a
+              href="https://resend.com/emails"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              View in Resend ↗
+            </a>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                  <th className="px-5 py-3 text-left">From</th>
+                  <th className="px-5 py-3 text-left">Subject</th>
+                  <th className="px-5 py-3 text-left">Sent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60">
+                {contactEmails.map(email => (
+                  <tr key={email.id} className="hover:bg-gray-800/40 transition-colors">
+                    <td className="px-5 py-3 text-gray-300 text-xs font-mono">
+                      {email.to?.[0] ?? "—"}
+                    </td>
+                    <td className="px-5 py-3 text-gray-100 text-sm">
+                      {email.subject}
+                    </td>
+                    <td className="px-5 py-3 text-gray-400 text-xs">
+                      {formatDate(email.sent_at ?? email.created_at)}
+                    </td>
+                  </tr>
+                ))}
+                {contactEmails.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-5 py-10 text-center text-gray-600">
+                      No contact messages yet.
                     </td>
                   </tr>
                 )}
