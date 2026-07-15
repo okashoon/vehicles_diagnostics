@@ -14,16 +14,6 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       if (account?.provider === "google" && user.email) {
         try {
-          // Ensure columns exist (idempotent)
-          await pool.query(`
-            ALTER TABLE users
-              ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
-              ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'email';
-            ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
-          `);
-
-          await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ`);
-
           await pool.query(
             `INSERT INTO users (email, name, email_verified, provider, last_login)
              VALUES ($1, $2, true, 'google', NOW())

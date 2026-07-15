@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Google-only account — no password set
     if (user.provider === "google" || !user.password_hash) {
       return NextResponse.json(
-        { error: "This account uses Google sign-in. Click 'Sign in with Google' below." },
+        { error: "This account uses Google sign-in. Click 'Sign in with Google'." },
         { status: 401 }
       );
     }
@@ -55,11 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await pool.query(
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
-       UPDATE users SET last_login = NOW() WHERE id = $1`,
-      [user.id]
-    );
+    await pool.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
 
     const token = createSessionToken(user.id);
     const res = NextResponse.json({ ok: true });

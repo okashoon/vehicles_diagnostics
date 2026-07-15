@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 
 const NAV_LINKS = [
   { label: "HOME", href: "/" },
@@ -15,9 +16,31 @@ const NAV_LINKS = [
   { label: "LOOKUP", href: "/lookup" },
 ];
 
+type Me = { name: string | null; email: string; role: string } | null;
+
 export function NavBarV3() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [me, setMe] = useState<Me>(undefined as unknown as Me);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => setMe(data))
+      .catch(() => setMe(null));
+  }, []);
+
+  async function handleSignOut() {
+    // Clear custom cookie session
+    await fetch("/api/auth/logout", { method: "POST" });
+    // Clear NextAuth JWT (Google OAuth) — redirects to "/" by default
+    await signOut({ redirect: false });
+    router.refresh();
+    router.push("/");
+  }
+
+  const displayName = me?.name ?? me?.email?.split("@")[0] ?? null;
 
   return (
     <header className="border-b border-[#00ff41]/20 bg-[#0a0a0a]">
@@ -53,6 +76,34 @@ export function NavBarV3() {
             })}
           </nav>
 
+          {/* User area (desktop) */}
+          <div className="hidden lg:flex items-center gap-3 shrink-0">
+            {me === (undefined as unknown as Me) ? (
+              /* still loading — reserve space */
+              <div className="w-24 h-5 rounded bg-[#00ff41]/10 animate-pulse" />
+            ) : me ? (
+              <>
+                {me.role === "admin" && (
+                  <Link
+                    href="/admin"
+                    className="font-mono text-[10px] tracking-widest text-red-400 hover:text-red-300 border border-red-800 hover:border-red-600 px-2 py-0.5 rounded transition-colors"
+                  >
+                    ADMIN
+                  </Link>
+                )}
+                <span className="font-mono text-[11px] text-[#00cc33] truncate max-w-[140px]">
+                  {displayName}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  className="font-mono text-[10px] tracking-widest text-[#00cc33] hover:text-[#00ff41] hover:bg-[#00ff41]/10 border border-[#00ff41]/30 hover:border-[#00ff41]/60 px-2 py-0.5 rounded transition-colors"
+                >
+                  SIGN OUT
+                </button>
+              </>
+            ) : null}
+          </div>
+
           {/* Mobile hamburger */}
           <button
             className="lg:hidden p-2 font-mono text-[#00cc33] hover:text-[#00ff41]"
@@ -84,6 +135,21 @@ export function NavBarV3() {
                 </Link>
               );
             })}
+
+            {/* Mobile user area */}
+            {me && (
+              <div className="border-t border-[#00ff41]/20 mt-2 pt-2 px-4 flex items-center justify-between">
+                <span className="font-mono text-[11px] text-[#00cc33] truncate">
+                  {displayName}
+                </span>
+                <button
+                  onClick={() => { setMobileOpen(false); handleSignOut(); }}
+                  className="font-mono text-[10px] tracking-widest text-[#00cc33] hover:text-[#00ff41] border border-[#00ff41]/30 px-2 py-0.5 rounded transition-colors"
+                >
+                  SIGN OUT
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

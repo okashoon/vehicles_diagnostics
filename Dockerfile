@@ -15,5 +15,9 @@ ENV NODE_ENV=production
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+# Migration script + runner (tsx + lib/db needed at runtime)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/lib/db.ts ./lib/db.ts
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node_modules/.bin/tsx scripts/migrate.ts && node server.js"]

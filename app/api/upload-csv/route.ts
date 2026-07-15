@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import type { PoolClient } from "pg";
 import pool from "@/lib/db";
 import { parseYear } from "@/lib/parse-year";
+import { requireAdmin } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
 // DDL
@@ -224,6 +225,10 @@ async function upsertVehicleInterface(
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  if (!(await requireAdmin())) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   let formData: FormData;
   try {
     formData = await request.formData();

@@ -7,19 +7,20 @@ interface UserRow {
   email: string;
   name: string | null;
   provider: string;
+  role: string;
   email_verified: boolean;
   created_at: string;
   last_login: string | null;
 }
 
-async function getAdminEmail(userId: number): Promise<string | null> {
-  const res = await pool.query("SELECT email FROM users WHERE id = $1", [userId]);
-  return res.rows[0]?.email ?? null;
+async function getUser(userId: number): Promise<{ email: string; name: string | null; role: string } | null> {
+  const res = await pool.query("SELECT email, name, role FROM users WHERE id = $1", [userId]);
+  return res.rows[0] ?? null;
 }
 
 async function getAllUsers(): Promise<UserRow[]> {
   const res = await pool.query(`
-    SELECT id, email, name, provider, email_verified, created_at, last_login
+    SELECT id, email, name, provider, role, email_verified, created_at, last_login
     FROM users
     ORDER BY created_at DESC
   `);
@@ -38,12 +39,8 @@ export default async function AdminPage() {
   const session = await getSession();
   if (!session) redirect("/");
 
-  const email = await getAdminEmail(session.userId);
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim().toLowerCase());
-
-  if (!email || !adminEmails.includes(email.toLowerCase())) {
-    redirect("/");
-  }
+  const user = await getUser(session.userId);
+  if (!user || user.role !== "admin") redirect("/");
 
   const users = await getAllUsers();
 
@@ -59,11 +56,22 @@ export default async function AdminPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-            <p className="text-gray-400 text-sm mt-1">Signed in as {email}</p>
+            <p className="text-gray-400 text-sm mt-1">
+            {user.name && <span className="text-gray-200 font-medium">{user.name} · </span>}
+            {user.email}
+          </p>
           </div>
-          <span className="text-xs bg-red-900/40 text-red-400 border border-red-800 px-3 py-1 rounded-full font-mono">
-            ADMIN
-          </span>
+          <div className="flex items-center gap-3">
+            <a
+              href="/upload-csv"
+              className="text-sm bg-blue-900/40 text-blue-400 border border-blue-800 hover:bg-blue-900/70 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Upload CSV
+            </a>
+            <span className="text-xs bg-red-900/40 text-red-400 border border-red-800 px-3 py-1 rounded-full font-mono">
+              ADMIN
+            </span>
+          </div>
         </div>
 
         {/* Stats */}
@@ -96,6 +104,7 @@ export default async function AdminPage() {
                   <th className="px-5 py-3 text-left">Email</th>
                   <th className="px-5 py-3 text-left">Name</th>
                   <th className="px-5 py-3 text-left">Provider</th>
+                  <th className="px-5 py-3 text-left">Role</th>
                   <th className="px-5 py-3 text-left">Verified</th>
                   <th className="px-5 py-3 text-left">Last Login</th>
                   <th className="px-5 py-3 text-left">Joined</th>
@@ -116,6 +125,15 @@ export default async function AdminPage() {
                         <span className="inline-flex items-center gap-1.5 text-xs bg-gray-800 text-gray-400 border border-gray-700 px-2 py-0.5 rounded-full">
                           Email
                         </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      {user.role === "admin" ? (
+                        <span className="text-xs bg-red-900/30 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full">
+                          admin
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-500">user</span>
                       )}
                     </td>
                     <td className="px-5 py-3">

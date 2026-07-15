@@ -71,6 +71,27 @@ export function verifySessionToken(token: string): { userId: number } | null {
 }
 
 // ---------------------------------------------------------------------------
+// DB helper (imported lazily to avoid circular deps at module level)
+// ---------------------------------------------------------------------------
+
+export async function getUserRole(userId: number): Promise<string | null> {
+  const { default: pool } = await import("@/lib/db");
+  const { rows } = await pool.query(
+    "SELECT role FROM users WHERE id = $1",
+    [userId]
+  );
+  return rows[0]?.role ?? null;
+}
+
+/** Resolves to the role string if the current request is an admin, otherwise null. */
+export async function requireAdmin(): Promise<string | null> {
+  const session = await getSession();
+  if (!session) return null;
+  const role = await getUserRole(session.userId);
+  return role === "admin" ? role : null;
+}
+
+// ---------------------------------------------------------------------------
 // Server-side session reader — checks custom cookie then NextAuth JWT
 // ---------------------------------------------------------------------------
 

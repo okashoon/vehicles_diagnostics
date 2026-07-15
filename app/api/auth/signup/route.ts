@@ -21,31 +21,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Ensure schema is up to date
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id             SERIAL PRIMARY KEY,
-        email          TEXT UNIQUE NOT NULL,
-        name           TEXT,
-        password_hash  TEXT,
-        provider       TEXT DEFAULT 'email',
-        email_verified BOOLEAN DEFAULT FALSE,
-        created_at     TIMESTAMPTZ DEFAULT NOW()
-      );
-      ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS provider       TEXT DEFAULT 'email',
-        ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
-      ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
-
-      CREATE TABLE IF NOT EXISTS verification_tokens (
-        id         SERIAL PRIMARY KEY,
-        token      TEXT UNIQUE NOT NULL,
-        user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW()
-      );
-    `);
-
     const normalizedEmail = email.trim().toLowerCase();
 
     // Check for existing account
