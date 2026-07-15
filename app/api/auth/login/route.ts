@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await pool.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ;
+       UPDATE users SET last_login = NOW() WHERE id = $1`,
+      [user.id]
+    );
+
     const token = createSessionToken(user.id);
     const res = NextResponse.json({ ok: true });
     res.cookies.set(SESSION_COOKIE, token, {

@@ -22,12 +22,15 @@ export const authOptions: NextAuthOptions = {
             ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
           `);
 
+          await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ`);
+
           await pool.query(
-            `INSERT INTO users (email, name, email_verified, provider)
-             VALUES ($1, $2, true, 'google')
+            `INSERT INTO users (email, name, email_verified, provider, last_login)
+             VALUES ($1, $2, true, 'google', NOW())
              ON CONFLICT (email) DO UPDATE
                SET name            = COALESCE(EXCLUDED.name, users.name),
-                   email_verified  = true`,
+                   email_verified  = true,
+                   last_login      = NOW()`,
             [user.email.toLowerCase(), user.name ?? null]
           );
         } catch (err) {
