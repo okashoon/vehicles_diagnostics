@@ -26,7 +26,8 @@ openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
   -subj   "/CN=localhost" 2>/dev/null
 
 echo "==> Starting nginx (with dummy cert)"
-docker compose up -d nginx
+docker compose up -d --force-recreate nginx
+sleep 3
 
 echo "==> Removing dummy cert"
 rm -rf ./certbot/conf/live
