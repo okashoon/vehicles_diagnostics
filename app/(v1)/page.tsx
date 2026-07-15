@@ -12,7 +12,7 @@ export default function HomeV3() {
       <section className="relative flex min-h-[65vh] items-center justify-center overflow-hidden">
         <video
           className="absolute inset-0 h-full w-full object-cover opacity-30"
-          src="https://crashpulse.com/wp-content/uploads/2025/10/CDX-Video.mp4"
+          src="/media/CDX-Video.mp4"
           autoPlay muted playsInline loop
         />
         <div className="absolute inset-0 bg-[#0a0a0a]/60" />

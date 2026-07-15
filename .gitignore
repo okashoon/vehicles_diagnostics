@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large static media (videos, etc.) — upload directly to server
+/media/*
+!/media/.gitkeep
