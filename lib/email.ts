@@ -11,7 +11,7 @@ export async function sendVerificationEmail(
   const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const verifyUrl = `${BASE_URL}/api/auth/verify?token=${token}`;
 
-  await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM,
     to: email,
     subject: "Verify your Crash Pulse account",
@@ -69,4 +69,11 @@ export async function sendVerificationEmail(
 </html>
     `.trim(),
   });
+
+  if (error) {
+    console.error("[email] Resend API error:", error);
+    throw new Error(`Failed to send verification email: ${error.message}`);
+  }
+
+  console.log("[email] Verification email sent to", email, "| id:", data?.id);
 }
