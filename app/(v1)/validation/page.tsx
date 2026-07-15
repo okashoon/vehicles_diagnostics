@@ -4,7 +4,7 @@ export default function ValidationV3() {
       <section className="mx-auto max-w-4xl px-4 py-16 space-y-10">
 
         <img
-          src="/Validation_image.jpeg"
+          src="/validation_image.jpeg"
           alt="SAE Validation Publication"
           className="w-full border border-[#00ff41]/20"
         />
