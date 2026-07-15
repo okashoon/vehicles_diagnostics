@@ -7,6 +7,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN tail -f /dev/null
 # RUN --mount=type=cache,target=/root/.npm npm run build
 
 # FROM node:20-alpine AS runner
