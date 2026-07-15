@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 
-const FROM = "admin@brighter-buds.com";
 
 export async function sendVerificationEmail(
   email: string,
@@ -10,6 +9,10 @@ export async function sendVerificationEmail(
   const resend = new Resend(process.env.RESEND_API_KEY);
   const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const verifyUrl = `${BASE_URL}/api/auth/verify?token=${token}`;
+  const FROM = process.env.SENDER_EMAIL;
+  if (!FROM) {
+    throw new Error("SENDER_EMAIL environment variable is not set");
+  }
 
   const { data, error } = await resend.emails.send({
     from: FROM,

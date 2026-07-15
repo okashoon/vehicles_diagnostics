@@ -2,17 +2,42 @@
 
 import { useState } from "react";
 
+const EMPTY = { firstName: "", lastName: "", email: "", phone: "", message: "" };
+
 export default function ContactV3() {
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "" });
+  const [form, setForm] = useState(EMPTY);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const inputClass = "w-full border border-[#00ff41]/30 bg-[#111111] px-4 py-2.5 text-sm font-mono text-[#00ff41] placeholder-[#00ff41]/20 focus:border-[#00ff41] focus:outline-none transition-colors";
@@ -56,7 +81,7 @@ export default function ContactV3() {
                   &gt; Thank you for reaching out. We&apos;ll be in touch shortly.
                 </p>
                 <button
-                  onClick={() => { setSubmitted(false); setForm({ firstName: "", lastName: "", email: "", phone: "", message: "" }); }}
+                  onClick={() => { setSubmitted(false); setForm(EMPTY); }}
                   className="text-xs text-[#00ff41] hover:underline tracking-widest"
                 >
                   [SEND_ANOTHER]
@@ -97,11 +122,17 @@ export default function ContactV3() {
                     className={`${inputClass} resize-none`}
                   />
                 </div>
+                {error && (
+                  <p className="border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs font-mono text-red-400">
+                    &gt; ERROR: {error}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full border border-[#00ff41] bg-[#00ff41]/10 px-6 py-3 text-xs font-bold font-mono tracking-widest text-[#00ff41] hover:bg-[#00ff41] hover:text-[#0a0a0a] transition-colors uppercase"
+                  disabled={loading}
+                  className="w-full border border-[#00ff41] bg-[#00ff41]/10 px-6 py-3 text-xs font-bold font-mono tracking-widest text-[#00ff41] hover:bg-[#00ff41] hover:text-[#0a0a0a] transition-colors uppercase disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  [ TRANSMIT_MESSAGE ]
+                  {loading ? "[ TRANSMITTING... ]" : "[ TRANSMIT_MESSAGE ]"}
                 </button>
               </form>
             )}
