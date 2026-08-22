@@ -7,11 +7,17 @@ type PaginationProps = {
   perPage: number;
   /** Current filter params — preserved when navigating between pages. */
   searchParams: Record<string, string>;
+  /** Pathname for page links. Defaults to "/lookup". */
+  basePath?: string;
 };
 
-function pageUrl(searchParams: Record<string, string>, p: number): string {
+function pageUrl(
+  basePath: string,
+  searchParams: Record<string, string>,
+  p: number
+): string {
   const params = new URLSearchParams({ ...searchParams, page: String(p) });
-  return `/?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 /** Returns a compact sequence of page numbers with "..." gaps. */
@@ -51,6 +57,7 @@ export function Pagination({
   total,
   perPage,
   searchParams,
+  basePath = "/lookup",
 }: PaginationProps) {
   if (totalPages <= 1 && total <= perPage) return null;
 
@@ -75,7 +82,7 @@ export function Pagination({
       <div className="flex items-center gap-1">
         {/* Previous */}
         {page > 1 ? (
-          <Link href={pageUrl(searchParams, page - 1)} className={IDLE_BTN}>
+          <Link href={pageUrl(basePath, searchParams, page - 1)} className={IDLE_BTN}>
             &larr;
           </Link>
         ) : (
@@ -94,7 +101,7 @@ export function Pagination({
           ) : (
             <Link
               key={p}
-              href={pageUrl(searchParams, p)}
+              href={pageUrl(basePath, searchParams, p)}
               className={p === page ? ACTIVE_BTN : IDLE_BTN}
             >
               {p}
@@ -104,7 +111,7 @@ export function Pagination({
 
         {/* Next */}
         {page < totalPages ? (
-          <Link href={pageUrl(searchParams, page + 1)} className={IDLE_BTN}>
+          <Link href={pageUrl(basePath, searchParams, page + 1)} className={IDLE_BTN}>
             &rarr;
           </Link>
         ) : (

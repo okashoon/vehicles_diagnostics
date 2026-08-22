@@ -7,7 +7,7 @@ export default async function UploadCsvPage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex items-start justify-center p-6">
-      <div className="w-full max-w-xl space-y-8 mt-16">
+      <div className="w-full max-w-2xl space-y-8 mt-16">
 
         {/* Header */}
         <div>
@@ -18,7 +18,8 @@ export default async function UploadCsvPage() {
             </span>
           </div>
           <p className="text-gray-400 text-sm">
-            Uploading a new CSV will drop and recreate the vehicles table, then insert all rows from the file.
+            Choose a CSV, map its headers to the internal fields, then import.
+            Importing drops and recreates the vehicles table.
           </p>
         </div>
 

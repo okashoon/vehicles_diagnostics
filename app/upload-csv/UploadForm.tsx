@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CSV_FIELDS, type CsvFieldKey } from "@/lib/csv-fields";
 
 type Status =
   | { type: "idle" }
@@ -8,23 +9,67 @@ type Status =
   | { type: "success"; inserted: number; filename: string }
   | { type: "error"; message: string };
 
+type Step = "pick" | "map";
+
 export function UploadForm() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [step, setStep] = useState<Step>("pick");
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<CsvFieldKey, string>>({} as Record<CsvFieldKey, string>);
   const [status, setStatus] = useState<Status>({ type: "idle" });
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function resetFile() {
+    setFile(null);
+    setStep("pick");
+    setHeaders([]);
+    setMapping({} as Record<CsvFieldKey, string>);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     setFile(f);
     setStatus({ type: "idle" });
+    setStep("pick");
+    setHeaders([]);
+
+    if (!f) return;
+
+    setStatus({ type: "loading" });
+    const formData = new FormData();
+    formData.append("file", f);
+
+    try {
+      const res = await fetch("/api/upload-csv/preview", { method: "POST", body: formData });
+      const json = await res.json();
+      if (!res.ok) {
+        setStatus({ type: "error", message: json.detail ?? json.error ?? "Could not read headers." });
+        return;
+      }
+      setHeaders(json.headers as string[]);
+      setMapping(json.suggested as Record<CsvFieldKey, string>);
+      setStep("map");
+      setStatus({ type: "idle" });
+    } catch (err) {
+      setStatus({ type: "error", message: String(err) });
+    }
   }
 
-  async function handleUpload() {
+  function setField(key: CsvFieldKey, csvHeader: string) {
+    setMapping((prev) => ({ ...prev, [key]: csvHeader }));
+  }
+
+  const mappedCount = CSV_FIELDS.filter((f) => mapping[f.key]).length;
+  const usedHeaders = new Set(CSV_FIELDS.map((f) => mapping[f.key]).filter(Boolean));
+
+  async function handleImport() {
     if (!file) return;
     setStatus({ type: "loading" });
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("mapping", JSON.stringify(mapping));
 
     try {
       const res = await fetch("/api/upload-csv", { method: "POST", body: formData });
@@ -34,8 +79,7 @@ export function UploadForm() {
         setStatus({ type: "error", message: json.detail ?? json.error ?? "Upload failed." });
       } else {
         setStatus({ type: "success", inserted: json.inserted, filename: file.name });
-        setFile(null);
-        if (inputRef.current) inputRef.current.value = "";
+        resetFile();
       }
     } catch (err) {
       setStatus({ type: "error", message: String(err) });
@@ -46,7 +90,6 @@ export function UploadForm() {
 
   return (
     <div className="space-y-6">
-      {/* Drop zone / file picker */}
       <label
         className={[
           "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 cursor-pointer transition-colors",
@@ -80,27 +123,80 @@ export function UploadForm() {
         )}
       </label>
 
-      {/* Upload button */}
-      <button
-        onClick={handleUpload}
-        disabled={!file || isLoading}
-        className="w-full py-3 px-6 rounded-lg text-sm font-semibold transition-colors
-          bg-blue-600 hover:bg-blue-500 text-white
-          disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-      >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Uploading…
-          </span>
-        ) : "Upload CSV"}
-      </button>
+      {step === "map" && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-200">Map columns</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Match each internal field to a header from the file. Unmapped fields are skipped.
+              {headers.length > 0 && (
+                <> File has {headers.length} header{headers.length === 1 ? "" : "s"}.</>
+              )}
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-gray-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                  <th className="px-4 py-2.5 text-left">Internal field</th>
+                  <th className="px-4 py-2.5 text-left">CSV header</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800/60">
+                {CSV_FIELDS.map((field) => (
+                  <tr key={field.key}>
+                    <td className="px-4 py-2">
+                      <p className="text-gray-200">{field.label}</p>
+                      <p className="font-mono text-[10px] text-gray-600">{field.key}</p>
+                    </td>
+                    <td className="px-4 py-2">
+                      <select
+                        value={mapping[field.key] ?? ""}
+                        onChange={(e) => setField(field.key, e.target.value)}
+                        className="w-full bg-gray-950 border border-gray-700 rounded-md px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="">— skip —</option>
+                        {headers.map((h) => (
+                          <option
+                            key={h}
+                            value={h}
+                            disabled={usedHeaders.has(h) && mapping[field.key] !== h}
+                          >
+                            {h}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500">{mappedCount} of {CSV_FIELDS.length} fields mapped</p>
+        </div>
+      )}
 
-      {/* Result */}
+      {step === "map" && (
+        <button
+          onClick={handleImport}
+          disabled={!file || isLoading || mappedCount === 0}
+          className="w-full py-3 px-6 rounded-lg text-sm font-semibold transition-colors
+            bg-blue-600 hover:bg-blue-500 text-white
+            disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+        >
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Importing…
+            </span>
+          ) : `Import CSV (${mappedCount} columns)`}
+        </button>
+      )}
+
       {status.type === "success" && (
         <div className="rounded-lg border border-green-800 bg-green-950/30 px-5 py-4">
           <p className="text-green-400 font-semibold text-sm">Upload successful</p>

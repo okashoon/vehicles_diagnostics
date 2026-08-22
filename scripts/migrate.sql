@@ -26,3 +26,29 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Controls which columns appear (and in what order) on the Lookup table.
+-- Hiding a column never deletes vehicle data.
+CREATE TABLE IF NOT EXISTS lookup_column_config (
+  key      TEXT    PRIMARY KEY,
+  label    TEXT    NOT NULL,
+  position INTEGER NOT NULL,
+  visible  BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+INSERT INTO lookup_column_config (key, label, position, visible) VALUES
+  ('year_display',          'YEAR',          0, TRUE),
+  ('make_name',             'MAKE',          1, TRUE),
+  ('model_name',            'MODEL',         2, TRUE),
+  ('model_notes',           'MODEL NOTES',   8, TRUE),
+  ('module_name',           'MODULE',        3, TRUE),
+  ('interface_names',       'INTERFACES',    4, TRUE),
+  ('obd_dlc_connect_cable', 'OBD CABLE',     5, TRUE),
+  ('obd_adapter',           'OBD Adapter',   9, TRUE),
+  ('d2m_connect_cable',     'D2M Cable',     6, TRUE),
+  ('d2m_adapter',           'D2M Adapter',  10, TRUE),
+  ('module_location',       'LOCATION',      7, TRUE)
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS obd_adapter TEXT;
+ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS d2m_adapter TEXT;

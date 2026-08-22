@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import pool from "@/lib/db";
 import { parseYear } from "@/lib/parse-year";
 import { requireAdmin } from "@/lib/auth";
+import { CSV_FIELD_KEYS, type CsvFieldKey } from "@/lib/csv-fields";
 
 // ---------------------------------------------------------------------------
 // DDL
@@ -57,7 +58,9 @@ const DDL = `
     year_make             TEXT,
     model_notes           TEXT,
     obd_dlc_connect_cable TEXT,
+    obd_adapter           TEXT,
     d2m_connect_cable     TEXT,
+    d2m_adapter           TEXT,
     module_location       TEXT,
     created_at            TIMESTAMPTZ DEFAULT NOW()
   );
@@ -84,7 +87,9 @@ type CsvRow = {
   module: string;
   vehicle_interface: string;
   obd_dlc_connect_cable: string;
+  obd_adapter: string;
   d2m_connect_cable: string;
+  d2m_adapter: string;
   module_location: string;
 };
 
@@ -92,19 +97,19 @@ type CsvRow = {
 // CSV parser
 // ---------------------------------------------------------------------------
 
-function parseCsv(buffer: Buffer): Promise<CsvRow[]> {
+function parseCsv(
+  buffer: Buffer,
+  mapping: Partial<Record<CsvFieldKey, string>>
+): Promise<CsvRow[]> {
   return new Promise((resolve, reject) => {
     const rows: CsvRow[] = [];
     Readable.from(buffer).pipe(
       parse({
         columns: (header: string[]) =>
-          header.map((h) =>
-            h
-              .toLowerCase()
-              .replace(/\//g, "_")
-              .replace(/[^a-z0-9]+/g, "_")
-              .replace(/^_|_$/g, "")
-          ),
+          header.map((h) => {
+            const field = CSV_FIELD_KEYS.find((key) => mapping[key] === h);
+            return field ?? false;
+          }),
         skip_empty_lines: true,
         trim: true,
       })
@@ -248,11 +253,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "Uploaded file must be a CSV" }, { status: 400 });
   }
 
+  const mappingRaw = formData.get("mapping");
+  let mapping: Partial<Record<CsvFieldKey, string>> = {};
+  if (typeof mappingRaw === "string" && mappingRaw.trim()) {
+    try {
+      mapping = JSON.parse(mappingRaw);
+    } catch {
+      return Response.json({ error: "Invalid column mapping JSON." }, { status: 400 });
+    }
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
 
   let rows: CsvRow[];
   try {
-    rows = await parseCsv(buffer);
+    rows = await parseCsv(buffer, mapping);
   } catch (err) {
     return Response.json(
       { error: "Failed to parse CSV", detail: String(err) },
@@ -298,8 +313,8 @@ export async function POST(request: Request) {
         `INSERT INTO vehicles
            (make_id, model_id, model_year_id, module_id,
             source_file, market, year_make, model_notes,
-            obd_dlc_connect_cable, d2m_connect_cable, module_location)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            obd_dlc_connect_cable, obd_adapter, d2m_connect_cable, d2m_adapter, module_location)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING id`,
         [
           makeId,
@@ -311,7 +326,9 @@ export async function POST(request: Request) {
           row.year_make ?? null,
           row.model_notes ?? null,
           row.obd_dlc_connect_cable ?? null,
+          row.obd_adapter ?? null,
           row.d2m_connect_cable ?? null,
+          row.d2m_adapter ?? null,
           row.module_location ?? null,
         ]
       );

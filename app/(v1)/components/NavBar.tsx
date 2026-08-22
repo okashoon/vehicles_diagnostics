@@ -13,7 +13,7 @@ const NAV_LINKS = [
   { label: "CONTACT", href: "/contact" },
   { label: "INNOVATE", href: "/innovate" },
   // { label: "SETUP", href: "/setup-guide" },
-  { label: "LOOKUP", href: "/lookup" },
+  { label: "VEHICLE LOOKUP", href: "/lookup" },
 ];
 
 type Me = { name: string | null; email: string; role: string } | null;
@@ -61,7 +61,7 @@ export function NavBarV3() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-0">
+          <nav className="hidden lg:flex items-center gap-3">
             {NAV_LINKS.map((link) => {
               const isActive = pathname === link.href;
               return (

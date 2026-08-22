@@ -3,6 +3,11 @@ import Link from "next/link";
 import pool from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { Resend } from "resend";
+import { getVehicles } from "@/lib/vehicles";
+import { getLookupColumnConfig } from "@/lib/lookup-columns";
+import { AdminDataTab } from "./AdminDataTab";
+
+const PER_PAGE = 100;
 
 interface UserRow {
   id: number;
@@ -16,6 +21,7 @@ interface UserRow {
 }
 
 type Filter = "verified" | "google" | "email" | null;
+type Tab = "users" | "data";
 
 async function getUser(userId: number): Promise<{ email: string; name: string | null; role: string } | null> {
   const res = await pool.query("SELECT email, name, role FROM users WHERE id = $1", [userId]);
@@ -73,7 +79,7 @@ function applyFilter(users: UserRow[], filter: Filter): UserRow[] {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; tab?: string; page?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/");
@@ -81,14 +87,18 @@ export default async function AdminPage({
   const user = await getUser(session.userId);
   if (!user || user.role !== "admin") redirect("/");
 
-  const { filter: rawFilter } = await searchParams;
+  const { filter: rawFilter, tab: rawTab, page: rawPage } = await searchParams;
+  const tab: Tab = rawTab === "data" ? "data" : "users";
   const filter: Filter = (["verified", "google", "email"].includes(rawFilter ?? "")
     ? rawFilter
     : null) as Filter;
+  const page = Math.max(1, Number(rawPage) || 1);
 
-  const [allUsers, contactEmails] = await Promise.all([
-    getAllUsers(),
-    getContactEmails(),
+  const [allUsers, contactEmails, vehicleResult, columnConfig] = await Promise.all([
+    tab === "users" ? getAllUsers() : Promise.resolve([] as UserRow[]),
+    tab === "users" ? getContactEmails() : Promise.resolve([] as ContactEmail[]),
+    tab === "data" ? getVehicles({}, page, PER_PAGE) : Promise.resolve({ rows: [], total: 0 }),
+    tab === "data" ? getLookupColumnConfig() : Promise.resolve([]),
   ]);
   const filteredUsers = applyFilter(allUsers, filter);
 
@@ -97,11 +107,11 @@ export default async function AdminPage({
   const emailUsers  = allUsers.filter(u => u.provider === "email").length;
 
   const stats = [
-    { label: "Total Users",      value: allUsers.length, color: "text-white",        filterKey: 'all',        activeRing: "ring-gray-500" },
-    { label: "Verified",         value: verified,         color: "text-green-400",   filterKey: "verified",  activeRing: "ring-green-500" },
-    { label: "Google OAuth",     value: googleUsers,      color: "text-blue-400",    filterKey: "google",    activeRing: "ring-blue-500" },
-    { label: "Email / Password", value: emailUsers,       color: "text-yellow-400",  filterKey: "email",     activeRing: "ring-yellow-500" },
-  ] as const;
+    { label: "Total Users",      value: allUsers.length, color: "text-white",        filterKey: null as Filter,     activeRing: "ring-gray-500" },
+    { label: "Verified",         value: verified,         color: "text-green-400",   filterKey: "verified" as Filter, activeRing: "ring-green-500" },
+    { label: "Google OAuth",     value: googleUsers,      color: "text-blue-400",    filterKey: "google" as Filter,   activeRing: "ring-blue-500" },
+    { label: "Email / Password", value: emailUsers,       color: "text-yellow-400",  filterKey: "email" as Filter,    activeRing: "ring-yellow-500" },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6">
@@ -129,174 +139,213 @@ export default async function AdminPage({
           </div>
         </div>
 
-        {/* Stat cards — clickable filters */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {stats.map(stat => {
-            const isActive = filter === stat.filterKey;
-            // clicking an active card clears the filter; clicking inactive sets it
-            const href = isActive || stat.filterKey === null
-              ? "/admin"
-              : `/admin?filter=${stat.filterKey}`;
+        {/* Tabs */}
+        <div className="flex border-b border-gray-800">
+          <Link
+            href="/admin"
+            className={[
+              "px-5 py-2.5 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px",
+              tab === "users"
+                ? "border-white text-white"
+                : "border-transparent text-gray-500 hover:text-gray-300",
+            ].join(" ")}
+          >
+            Users
+          </Link>
+          <Link
+            href="/admin?tab=data"
+            className={[
+              "px-5 py-2.5 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px",
+              tab === "data"
+                ? "border-white text-white"
+                : "border-transparent text-gray-500 hover:text-gray-300",
+            ].join(" ")}
+          >
+            Data
+          </Link>
+        </div>
 
-            return (
-              <Link
-                key={stat.label}
-                href={href}
-                className={[
-                  "bg-gray-900 border rounded-lg p-4 transition-all",
-                  stat.filterKey === null
-                    ? "cursor-default pointer-events-none border-gray-800"
-                    : isActive
-                      ? `border-gray-600 ring-1 ${stat.activeRing}`
-                      : "border-gray-800 hover:border-gray-600 hover:bg-gray-800/60",
-                ].join(" ")}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-gray-400 text-xs uppercase tracking-wider">{stat.label}</p>
-                  {isActive && (
-                    <span className="text-[10px] text-gray-400 border border-gray-700 px-1.5 py-0.5 rounded font-mono shrink-0">
-                      ✕ clear
-                    </span>
+        {tab === "data" ? (
+          <AdminDataTab
+            vehicles={vehicleResult.rows}
+            total={vehicleResult.total}
+            page={page}
+            perPage={PER_PAGE}
+            columns={columnConfig}
+          />
+        ) : (
+          <>
+            {/* Stat cards — clickable filters */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {stats.map(stat => {
+                const isActive = filter === stat.filterKey;
+                const href = isActive || stat.filterKey === null
+                  ? "/admin"
+                  : `/admin?filter=${stat.filterKey}`;
+
+                return (
+                  <Link
+                    key={stat.label}
+                    href={href}
+                    className={[
+                      "bg-gray-900 border rounded-lg p-4 transition-all",
+                      stat.filterKey === null
+                        ? isActive
+                          ? `border-gray-600 ring-1 ${stat.activeRing}`
+                          : "border-gray-800 hover:border-gray-600 hover:bg-gray-800/60"
+                        : isActive
+                          ? `border-gray-600 ring-1 ${stat.activeRing}`
+                          : "border-gray-800 hover:border-gray-600 hover:bg-gray-800/60",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-gray-400 text-xs uppercase tracking-wider">{stat.label}</p>
+                      {isActive && stat.filterKey !== null && (
+                        <span className="text-[10px] text-gray-400 border border-gray-700 px-1.5 py-0.5 rounded font-mono shrink-0">
+                          ✕ clear
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Users table */}
+            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                  {filter ? (
+                    <>
+                      <span className="text-gray-500">Filtered: </span>
+                      <span className="text-white">{filter}</span>
+                      <span className="text-gray-500"> — {filteredUsers.length} of {allUsers.length} users</span>
+                    </>
+                  ) : (
+                    <>All Users ({allUsers.length})</>
                   )}
-                </div>
-                <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Users table */}
-        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-              {filter ? (
-                <>
-                  <span className="text-gray-500">Filtered: </span>
-                  <span className="text-white">{filter}</span>
-                  <span className="text-gray-500"> — {filteredUsers.length} of {allUsers.length} users</span>
-                </>
-              ) : (
-                <>All Users ({allUsers.length})</>
-              )}
-            </h2>
-            {filter && (
-              <Link href="/admin" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
-                Clear filter ✕
-              </Link>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="px-5 py-3 text-left">ID</th>
-                  <th className="px-5 py-3 text-left">Email</th>
-                  <th className="px-5 py-3 text-left">Name</th>
-                  <th className="px-5 py-3 text-left">Provider</th>
-                  <th className="px-5 py-3 text-left">Role</th>
-                  <th className="px-5 py-3 text-left">Verified</th>
-                  <th className="px-5 py-3 text-left">Last Login</th>
-                  <th className="px-5 py-3 text-left">Joined</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/60">
-                {filteredUsers.map(u => (
-                  <tr key={u.id} className="hover:bg-gray-800/40 transition-colors">
-                    <td className="px-5 py-3 text-gray-500 font-mono text-xs">{u.id}</td>
-                    <td className="px-5 py-3 text-gray-100">{u.email}</td>
-                    <td className="px-5 py-3 text-gray-300">{u.name ?? <span className="text-gray-600 italic">—</span>}</td>
-                    <td className="px-5 py-3">
-                      {u.provider === "google" ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs bg-blue-900/30 text-blue-400 border border-blue-800/50 px-2 py-0.5 rounded-full">
-                          Google
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs bg-gray-800 text-gray-400 border border-gray-700 px-2 py-0.5 rounded-full">
-                          Email
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      {u.role === "admin" ? (
-                        <span className="text-xs bg-red-900/30 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full">
-                          admin
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-500">user</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      {u.email_verified ? (
-                        <span className="text-green-400 text-xs font-medium">✓ Yes</span>
-                      ) : (
-                        <span className="text-yellow-500 text-xs font-medium">Pending</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-gray-400 text-xs">{formatDate(u.last_login)}</td>
-                    <td className="px-5 py-3 text-gray-400 text-xs">{formatDate(u.created_at)}</td>
-                  </tr>
-                ))}
-                {filteredUsers.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-5 py-10 text-center text-gray-600">
-                      No users match this filter.
-                    </td>
-                  </tr>
+                </h2>
+                {filter && (
+                  <Link href="/admin" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                    Clear filter ✕
+                  </Link>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                      <th className="px-5 py-3 text-left">ID</th>
+                      <th className="px-5 py-3 text-left">Email</th>
+                      <th className="px-5 py-3 text-left">Name</th>
+                      <th className="px-5 py-3 text-left">Provider</th>
+                      <th className="px-5 py-3 text-left">Role</th>
+                      <th className="px-5 py-3 text-left">Verified</th>
+                      <th className="px-5 py-3 text-left">Last Login</th>
+                      <th className="px-5 py-3 text-left">Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800/60">
+                    {filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-gray-800/40 transition-colors">
+                        <td className="px-5 py-3 text-gray-500 font-mono text-xs">{u.id}</td>
+                        <td className="px-5 py-3 text-gray-100">{u.email}</td>
+                        <td className="px-5 py-3 text-gray-300">{u.name ?? <span className="text-gray-600 italic">—</span>}</td>
+                        <td className="px-5 py-3">
+                          {u.provider === "google" ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs bg-blue-900/30 text-blue-400 border border-blue-800/50 px-2 py-0.5 rounded-full">
+                              Google
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-xs bg-gray-800 text-gray-400 border border-gray-700 px-2 py-0.5 rounded-full">
+                              Email
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {u.role === "admin" ? (
+                            <span className="text-xs bg-red-900/30 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full">
+                              admin
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500">user</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {u.email_verified ? (
+                            <span className="text-green-400 text-xs font-medium">✓ Yes</span>
+                          ) : (
+                            <span className="text-yellow-500 text-xs font-medium">Pending</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-gray-400 text-xs">{formatDate(u.last_login)}</td>
+                        <td className="px-5 py-3 text-gray-400 text-xs">{formatDate(u.created_at)}</td>
+                      </tr>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="px-5 py-10 text-center text-gray-600">
+                          No users match this filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-        {/* Contact messages */}
-        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-              Contact Messages ({contactEmails.length})
-            </h2>
-            <a
-              href="https://resend.com/emails"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              View in Resend ↗
-            </a>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="px-5 py-3 text-left">From</th>
-                  <th className="px-5 py-3 text-left">Subject</th>
-                  <th className="px-5 py-3 text-left">Sent</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800/60">
-                {contactEmails.map(email => (
-                  <tr key={email.id} className="hover:bg-gray-800/40 transition-colors">
-                    <td className="px-5 py-3 text-gray-300 text-xs font-mono">
-                      {email.reply_to?.[0] ?? "—"}
-                    </td>
-                    <td className="px-5 py-3 text-gray-100 text-sm">
-                      {email.subject}
-                    </td>
-                    <td className="px-5 py-3 text-gray-400 text-xs">
-                      {formatDate(email.sent_at ?? email.created_at)}
-                    </td>
-                  </tr>
-                ))}
-                {contactEmails.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-10 text-center text-gray-600">
-                      No contact messages yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            {/* Contact messages */}
+            <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+                  Contact Messages ({contactEmails.length})
+                </h2>
+                <a
+                  href="https://resend.com/emails"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  View in Resend ↗
+                </a>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                      <th className="px-5 py-3 text-left">From</th>
+                      <th className="px-5 py-3 text-left">Subject</th>
+                      <th className="px-5 py-3 text-left">Sent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800/60">
+                    {contactEmails.map(email => (
+                      <tr key={email.id} className="hover:bg-gray-800/40 transition-colors">
+                        <td className="px-5 py-3 text-gray-300 text-xs font-mono">
+                          {email.reply_to?.[0] ?? "—"}
+                        </td>
+                        <td className="px-5 py-3 text-gray-100 text-sm">
+                          {email.subject}
+                        </td>
+                        <td className="px-5 py-3 text-gray-400 text-xs">
+                          {formatDate(email.sent_at ?? email.created_at)}
+                        </td>
+                      </tr>
+                    ))}
+                    {contactEmails.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-10 text-center text-gray-600">
+                          No contact messages yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
       </div>
     </div>
