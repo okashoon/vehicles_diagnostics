@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation";
 import pool from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getProfileStatus, getSession } from "@/lib/auth";
 import { FiltersBar } from "@/app/components/FiltersBar";
 import { Pagination } from "@/app/components/Pagination";
 import { LoginPrompt } from "@/app/components/LoginPrompt";
@@ -63,6 +64,12 @@ export default async function LookupV3({
   const sp = await searchParams;
   const session = await getSession();
   const isAuthenticated = session !== null;
+
+  // Google sign-ins (and legacy accounts) never supplied a company — collect it first.
+  if (session) {
+    const profile = await getProfileStatus(session.userId);
+    if (!profile.complete) redirect("/complete-profile");
+  }
 
   const makeId      = typeof sp.make_id      === "string" ? Number(sp.make_id)      : undefined;
   const modelId     = typeof sp.model_id     === "string" ? Number(sp.model_id)     : undefined;

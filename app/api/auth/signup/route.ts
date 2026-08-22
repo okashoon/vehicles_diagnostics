@@ -4,11 +4,21 @@ import { hashPassword, createVerificationToken } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
-  const { email, password, name } = await req.json();
+  const { email, password, name, company } = await req.json();
 
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email and password are required." },
+      { status: 400 }
+    );
+  }
+
+  const trimmedName = typeof name === "string" ? name.trim() : "";
+  const trimmedCompany = typeof company === "string" ? company.trim() : "";
+
+  if (!trimmedName || !trimmedCompany) {
+    return NextResponse.json(
+      { error: "Name and company are required." },
       { status: 400 }
     );
   }
@@ -38,7 +48,11 @@ export async function POST(req: NextRequest) {
         );
       }
       if (!user.email_verified) {
-        // Resend verification email
+        // Keep the latest details from this attempt, then resend verification
+        await pool.query(
+          "UPDATE users SET name = $2, company = $3 WHERE id = $1",
+          [user.id, trimmedName, trimmedCompany]
+        );
         const token = createVerificationToken();
         await pool.query(
           `INSERT INTO verification_tokens (token, user_id, expires_at)
@@ -60,10 +74,10 @@ export async function POST(req: NextRequest) {
     // Create new unverified user
     const hash = await hashPassword(password);
     const result = await pool.query(
-      `INSERT INTO users (email, name, password_hash, provider, email_verified)
-       VALUES ($1, $2, $3, 'email', false)
+      `INSERT INTO users (email, name, company, password_hash, provider, email_verified)
+       VALUES ($1, $2, $3, $4, 'email', false)
        RETURNING id`,
-      [normalizedEmail, name?.trim() || null, hash]
+      [normalizedEmail, trimmedName, trimmedCompany, hash]
     );
 
     // Create verification token (24 hour expiry)

@@ -7,6 +7,7 @@ import { getVehicles } from "@/lib/vehicles";
 import { getLookupColumnConfig } from "@/lib/lookup-columns";
 import { AdminDataTab } from "./AdminDataTab";
 import { AdminCablesTab } from "./AdminCablesTab";
+import { RoleSelect } from "./RoleSelect";
 import { listCables, scanCables } from "@/lib/cables-db";
 import type { CableRecord } from "@/lib/cable-utils";
 
@@ -16,6 +17,7 @@ interface UserRow {
   id: number;
   email: string;
   name: string | null;
+  company: string | null;
   provider: string;
   role: string;
   email_verified: boolean;
@@ -33,7 +35,7 @@ async function getUser(userId: number): Promise<{ email: string; name: string | 
 
 async function getAllUsers(): Promise<UserRow[]> {
   const res = await pool.query(`
-    SELECT id, email, name, provider, role, email_verified, created_at, last_login
+    SELECT id, email, name, company, provider, role, email_verified, created_at, last_login
     FROM users
     ORDER BY created_at DESC
   `);
@@ -267,6 +269,7 @@ export default async function AdminPage({
                       <th className="px-5 py-3 text-left">ID</th>
                       <th className="px-5 py-3 text-left">Email</th>
                       <th className="px-5 py-3 text-left">Name</th>
+                      <th className="px-5 py-3 text-left">Company</th>
                       <th className="px-5 py-3 text-left">Provider</th>
                       <th className="px-5 py-3 text-left">Role</th>
                       <th className="px-5 py-3 text-left">Verified</th>
@@ -280,6 +283,7 @@ export default async function AdminPage({
                         <td className="px-5 py-3 text-gray-500 font-mono text-xs">{u.id}</td>
                         <td className="px-5 py-3 text-gray-100">{u.email}</td>
                         <td className="px-5 py-3 text-gray-300">{u.name ?? <span className="text-gray-600 italic">—</span>}</td>
+                        <td className="px-5 py-3 text-gray-300">{u.company ?? <span className="text-gray-600 italic">—</span>}</td>
                         <td className="px-5 py-3">
                           {u.provider === "google" ? (
                             <span className="inline-flex items-center gap-1.5 text-xs bg-blue-900/30 text-blue-400 border border-blue-800/50 px-2 py-0.5 rounded-full">
@@ -292,12 +296,15 @@ export default async function AdminPage({
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          {u.role === "admin" ? (
-                            <span className="text-xs bg-red-900/30 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full">
-                              admin
+                          {u.id === session.userId ? (
+                            <span
+                              className="text-xs bg-red-900/30 text-red-400 border border-red-800/50 px-2 py-0.5 rounded-full"
+                              title="You cannot change your own role"
+                            >
+                              {u.role} (you)
                             </span>
                           ) : (
-                            <span className="text-xs text-gray-500">user</span>
+                            <RoleSelect userId={u.id} role={u.role} />
                           )}
                         </td>
                         <td className="px-5 py-3">
@@ -313,7 +320,7 @@ export default async function AdminPage({
                     ))}
                     {filteredUsers.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-5 py-10 text-center text-gray-600">
+                        <td colSpan={9} className="px-5 py-10 text-center text-gray-600">
                           No users match this filter.
                         </td>
                       </tr>

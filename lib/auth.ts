@@ -83,6 +83,24 @@ export async function getUserRole(userId: number): Promise<string | null> {
   return rows[0]?.role ?? null;
 }
 
+export type ProfileStatus = {
+  name: string | null;
+  company: string | null;
+  complete: boolean;
+};
+
+/** Name and company are mandatory, so Google users and legacy accounts need a top-up. */
+export async function getProfileStatus(userId: number): Promise<ProfileStatus> {
+  const { default: pool } = await import("@/lib/db");
+  const { rows } = await pool.query(
+    "SELECT name, company FROM users WHERE id = $1",
+    [userId]
+  );
+  const name = rows[0]?.name?.trim() || null;
+  const company = rows[0]?.company?.trim() || null;
+  return { name, company, complete: Boolean(name && company) };
+}
+
 /** Resolves to the role string if the current request is an admin, otherwise null. */
 export async function requireAdmin(): Promise<string | null> {
   const session = await getSession();

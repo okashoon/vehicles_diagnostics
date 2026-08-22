@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   id             SERIAL PRIMARY KEY,
   email          TEXT UNIQUE NOT NULL,
   name           TEXT,
+  company        TEXT,
   password_hash  TEXT,
   provider       TEXT        NOT NULL DEFAULT 'email',
   email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -17,6 +18,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS provider       TEXT        NOT NULL D
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN     NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login     TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role           TEXT        NOT NULL DEFAULT 'user';
+-- Nullable so pre-existing accounts still load; both name and company are
+-- required at signup and backfilled on next sign-in via /complete-profile.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company        TEXT;
 ALTER TABLE users ALTER  COLUMN password_hash DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS verification_tokens (
