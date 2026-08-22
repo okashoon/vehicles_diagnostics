@@ -5,6 +5,7 @@ import pool from "@/lib/db";
 import { parseYear } from "@/lib/parse-year";
 import { requireAdmin } from "@/lib/auth";
 import { CSV_FIELD_KEYS, type CsvFieldKey } from "@/lib/csv-fields";
+import { resolveCableName } from "@/lib/cables-db";
 
 // ---------------------------------------------------------------------------
 // DDL
@@ -309,6 +310,10 @@ export async function POST(request: Request) {
 
       const moduleId = moduleName ? await upsertModule(client, moduleName) : null;
 
+      // Reuse canonical names for cable spellings an admin already merged.
+      const obdCable = await resolveCableName(row.obd_dlc_connect_cable, "obd");
+      const d2mCable = await resolveCableName(row.d2m_connect_cable, "d2m");
+
       const { rows: vehicleRows } = await client.query<{ id: number }>(
         `INSERT INTO vehicles
            (make_id, model_id, model_year_id, module_id,
@@ -325,9 +330,9 @@ export async function POST(request: Request) {
           row.market ?? null,
           row.year_make ?? null,
           row.model_notes ?? null,
-          row.obd_dlc_connect_cable ?? null,
+          obdCable ?? null,
           row.obd_adapter ?? null,
-          row.d2m_connect_cable ?? null,
+          d2mCable ?? null,
           row.d2m_adapter ?? null,
           row.module_location ?? null,
         ]

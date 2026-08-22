@@ -6,6 +6,9 @@ import { Resend } from "resend";
 import { getVehicles } from "@/lib/vehicles";
 import { getLookupColumnConfig } from "@/lib/lookup-columns";
 import { AdminDataTab } from "./AdminDataTab";
+import { AdminCablesTab } from "./AdminCablesTab";
+import { listCables, scanCables } from "@/lib/cables-db";
+import type { CableRecord } from "@/lib/cable-utils";
 
 const PER_PAGE = 100;
 
@@ -21,7 +24,7 @@ interface UserRow {
 }
 
 type Filter = "verified" | "google" | "email" | null;
-type Tab = "users" | "data";
+type Tab = "users" | "data" | "cables";
 
 async function getUser(userId: number): Promise<{ email: string; name: string | null; role: string } | null> {
   const res = await pool.query("SELECT email, name, role FROM users WHERE id = $1", [userId]);
@@ -69,6 +72,16 @@ async function getContactEmails(): Promise<ContactEmail[]> {
   }
 }
 
+async function getCables(): Promise<CableRecord[]> {
+  try {
+    await scanCables();
+    return await listCables();
+  } catch (err) {
+    console.error("[admin] cable scan failed:", err);
+    return [];
+  }
+}
+
 function applyFilter(users: UserRow[], filter: Filter): UserRow[] {
   if (filter === "verified") return users.filter(u => u.email_verified);
   if (filter === "google")   return users.filter(u => u.provider === "google");
@@ -88,17 +101,19 @@ export default async function AdminPage({
   if (!user || user.role !== "admin") redirect("/");
 
   const { filter: rawFilter, tab: rawTab, page: rawPage } = await searchParams;
-  const tab: Tab = rawTab === "data" ? "data" : "users";
+  const tab: Tab =
+    rawTab === "data" ? "data" : rawTab === "cables" ? "cables" : "users";
   const filter: Filter = (["verified", "google", "email"].includes(rawFilter ?? "")
     ? rawFilter
     : null) as Filter;
   const page = Math.max(1, Number(rawPage) || 1);
 
-  const [allUsers, contactEmails, vehicleResult, columnConfig] = await Promise.all([
+  const [allUsers, contactEmails, vehicleResult, columnConfig, cables] = await Promise.all([
     tab === "users" ? getAllUsers() : Promise.resolve([] as UserRow[]),
     tab === "users" ? getContactEmails() : Promise.resolve([] as ContactEmail[]),
     tab === "data" ? getVehicles({}, page, PER_PAGE) : Promise.resolve({ rows: [], total: 0 }),
     tab === "data" ? getLookupColumnConfig() : Promise.resolve([]),
+    tab === "cables" ? getCables() : Promise.resolve([] as CableRecord[]),
   ]);
   const filteredUsers = applyFilter(allUsers, filter);
 
@@ -163,6 +178,17 @@ export default async function AdminPage({
           >
             Data
           </Link>
+          <Link
+            href="/admin?tab=cables"
+            className={[
+              "px-5 py-2.5 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px",
+              tab === "cables"
+                ? "border-white text-white"
+                : "border-transparent text-gray-500 hover:text-gray-300",
+            ].join(" ")}
+          >
+            Cables
+          </Link>
         </div>
 
         {tab === "data" ? (
@@ -173,6 +199,8 @@ export default async function AdminPage({
             perPage={PER_PAGE}
             columns={columnConfig}
           />
+        ) : tab === "cables" ? (
+          <AdminCablesTab initialCables={cables} />
         ) : (
           <>
             {/* Stat cards — clickable filters */}

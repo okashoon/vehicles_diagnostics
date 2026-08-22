@@ -52,3 +52,28 @@ ON CONFLICT (key) DO NOTHING;
 
 ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS obd_adapter TEXT;
 ALTER TABLE IF EXISTS vehicles ADD COLUMN IF NOT EXISTS d2m_adapter TEXT;
+
+-- Canonical cable names per category ('obd' | 'd2m'), plus every raw spelling
+-- that should resolve to them. Merging never deletes vehicle rows.
+CREATE TABLE IF NOT EXISTS cables (
+  id         SERIAL PRIMARY KEY,
+  kind       TEXT        NOT NULL DEFAULT 'obd',
+  name       TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE cables ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'obd';
+DROP INDEX IF EXISTS cables_name_uq;
+CREATE UNIQUE INDEX IF NOT EXISTS cables_kind_name_uq ON cables (kind, name);
+
+CREATE TABLE IF NOT EXISTS cable_aliases (
+  id         SERIAL PRIMARY KEY,
+  cable_id   INT         NOT NULL REFERENCES cables (id) ON DELETE CASCADE,
+  kind       TEXT        NOT NULL DEFAULT 'obd',
+  raw_name   TEXT        NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE cable_aliases ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'obd';
+DROP INDEX IF EXISTS cable_aliases_raw_name_uq;
+CREATE UNIQUE INDEX IF NOT EXISTS cable_aliases_kind_raw_name_uq ON cable_aliases (kind, raw_name);
