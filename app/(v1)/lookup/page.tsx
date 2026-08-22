@@ -81,11 +81,14 @@ export default async function LookupV3({
       : undefined;
 
   const page = typeof sp.page === "string" ? Math.max(1, Number(sp.page)) : 1;
-  const hasFilters = makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0);
+  const hasFilters = Boolean(
+    makeId || modelId || yearId || moduleId || (interfaceIds && interfaceIds.length > 0)
+  );
 
+  // Results stay empty until at least one filter is applied — no full-table dump.
   const [filterOptions, vehicleResult, columnConfig] = await Promise.all([
     getFilterOptions(),
-    isAuthenticated
+    isAuthenticated && hasFilters
       ? getVehicles({ makeId, modelId, yearId, moduleId, interfaceIds }, page, PER_PAGE)
       : Promise.resolve({ rows: [], total: 0 }),
     getLookupColumnConfig(),
@@ -114,13 +117,13 @@ export default async function LookupV3({
               Vehicle Diagnostics Lookup
             </h1>
             <p className="mt-1 text-xs text-[#00cc33]/60 tracking-wide">
-              {isAuthenticated
-                ? total > 0
-                  ? `> ${total.toLocaleString()} RECORD${total === 1 ? "" : "S"}${hasFilters ? " MATCHING FILTERS" : " LOADED"}`
-                  : hasFilters
-                  ? "> NO RECORDS MATCH FILTERS"
-                  : "> NO RECORDS FOUND"
-                : "> AUTHENTICATION REQUIRED — APPLY FILTERS THEN SIGN IN"}
+              {!isAuthenticated
+                ? "> AUTHENTICATION REQUIRED — APPLY FILTERS THEN SIGN IN"
+                : !hasFilters
+                ? "> APPLY FILTERS TO SEARCH THE DATABASE"
+                : total > 0
+                ? `> ${total.toLocaleString()} RECORD${total === 1 ? "" : "S"} MATCHING FILTERS`
+                : "> NO RECORDS MATCH FILTERS"}
             </p>
           </div>
         </div>
@@ -145,7 +148,7 @@ export default async function LookupV3({
         ) : vehicles.length === 0 ? (
           <div className="border border-dashed border-[#00ff41]/20 bg-[#111111] py-16 text-center">
             <p className="text-sm text-[#00cc33]/60 font-mono tracking-widest">
-              {hasFilters ? "> NO RECORDS MATCH FILTERS" : "> NO RECORDS FOUND"}
+              {!hasFilters ? "> APPLY FILTERS TO SEARCH THE DATABASE" : "> NO RECORDS MATCH FILTERS"}
             </p>
           </div>
         ) : (

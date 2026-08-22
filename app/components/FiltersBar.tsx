@@ -465,7 +465,7 @@ export function FiltersBar({
         </div>
 
         {/* Module */}
-        <div className="flex min-w-44 flex-1 flex-col gap-1">
+        {/* <div className="flex min-w-44 flex-1 flex-col gap-1">
           <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
             Module
           </label>
@@ -483,7 +483,7 @@ export function FiltersBar({
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
 
         {/* Interface (multi-select) */}
         <div className="flex min-w-48 flex-1 flex-col gap-1">
