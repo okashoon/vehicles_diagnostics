@@ -6,6 +6,7 @@ import { Pagination } from "@/app/components/Pagination";
 import { LoginPrompt } from "@/app/components/LoginPrompt";
 import { NotesCell } from "@/app/components/NotesCell";
 import { VehicleColumnHeaders } from "@/app/components/VehicleColumnHeaders";
+import { BackToTop } from "@/app/components/BackToTop";
 import type {
   Make,
   Model,
@@ -202,6 +203,7 @@ export default async function LookupV3({
           </div>
         )}
       </div>
+      <BackToTop />
     </div>
   );
 }
