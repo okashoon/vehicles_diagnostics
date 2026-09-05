@@ -6,6 +6,14 @@ import { useRouter } from "next/navigation";
 const inputClass =
   "w-full border border-[#00ff41]/30 bg-[#111111] px-3 py-2 text-sm text-[#e0ffe0] outline-none placeholder:text-[#00cc33]/30 focus:border-[#00ff41]";
 
+function splitName(full: string): { first: string; last: string } {
+  const trimmed = full.trim();
+  if (!trimmed) return { first: "", last: "" };
+  const space = trimmed.indexOf(" ");
+  if (space === -1) return { first: trimmed, last: "" };
+  return { first: trimmed.slice(0, space), last: trimmed.slice(space + 1).trim() };
+}
+
 export function CompleteProfileForm({
   initialName,
   initialCompany,
@@ -14,7 +22,9 @@ export function CompleteProfileForm({
   initialCompany: string;
 }) {
   const router = useRouter();
-  const [name, setName] = useState(initialName);
+  const split = splitName(initialName);
+  const [firstName, setFirstName] = useState(split.first);
+  const [lastName, setLastName] = useState(split.last);
   const [company, setCompany] = useState(initialCompany);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -27,7 +37,10 @@ export function CompleteProfileForm({
       const res = await fetch("/api/auth/complete-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, company }),
+        body: JSON.stringify({
+          name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          company,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
@@ -41,19 +54,35 @@ export function CompleteProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
-      <div>
-        <label className="mb-1 block text-xs uppercase tracking-widest text-[#00cc33]/70">
-          Name
-        </label>
-        <input
-          type="text"
-          autoComplete="name"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
-          className={inputClass}
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-[#00cc33]/70">
+            First name
+          </label>
+          <input
+            type="text"
+            autoComplete="given-name"
+            required
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="First"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-widest text-[#00cc33]/70">
+            Last name
+          </label>
+          <input
+            type="text"
+            autoComplete="family-name"
+            required
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="Last"
+            className={inputClass}
+          />
+        </div>
       </div>
 
       <div>

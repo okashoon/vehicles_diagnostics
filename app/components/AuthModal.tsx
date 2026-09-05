@@ -17,8 +17,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
   const [screen, setScreen] = useState<Screen>("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
+  const [acceptedDisclaimer, setAcceptedDisclaimer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -29,8 +31,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       setScreen("form");
       setEmail("");
       setPassword("");
-      setName("");
+      setFirstName("");
+      setLastName("");
       setCompany("");
+      setAcceptedDisclaimer(false);
       setError(null);
     }
   }, [open]);
@@ -48,6 +52,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (tab === "signup" && !acceptedDisclaimer) return;
     setError(null);
     setLoading(true);
 
@@ -56,7 +61,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
         tab === "login" ? "/api/auth/login" : "/api/auth/signup";
       const body: Record<string, string> = { email, password };
       if (tab === "signup") {
-        body.name = name;
+        body.name = `${firstName.trim()} ${lastName.trim()}`.trim();
         body.company = company;
       }
 
@@ -89,6 +94,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
   }
 
   async function handleGoogleSignIn() {
+    if (tab === "signup" && !acceptedDisclaimer) return;
     setError(null);
     setLoading(true);
     try {
@@ -113,7 +119,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-8 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
         {/* Close */}
         <button
           type="button"
@@ -174,11 +180,42 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
                 : "Get free access to vehicle diagnostics data."}
             </p>
 
+            {tab === "signup" && (
+              <p className="mb-5 max-h-36 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-[11px] leading-relaxed text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-400">
+                The information in this Vehicle Lookup tool was compiled from the
+                Bosch CDR software help file, section “Vehicle and Cable Lookup,”
+                version 25.0883, and is provided as a reference convenience only.
+                While every effort has been made to compile this information
+                accurately, Crash Pulse Technologies LLC makes no warranty, express
+                or implied, as to its accuracy, completeness, or currency, and
+                assumes no liability for errors, omissions, or typographical
+                mistakes. Always verify vehicle coverage and cable or adapter
+                selection before conducting a vehicle inspection or connecting any
+                cable, adapter, or interface to a vehicle or module. Crash Pulse
+                Technologies LLC is not affiliated with or endorsed by Bosch, the
+                NTSB, or the federal government.
+              </p>
+            )}
+
+            {tab === "signup" && (
+              <label className="mb-5 flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedDisclaimer}
+                  onChange={(e) => setAcceptedDisclaimer(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-zinc-900 cursor-pointer dark:accent-zinc-100"
+                />
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  I have read the disclaimer above
+                </span>
+              </label>
+            )}
+
             {/* Google button */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              disabled={loading}
+              disabled={loading || (tab === "signup" && !acceptedDisclaimer)}
               className="mb-4 flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" aria-hidden="true">
@@ -228,19 +265,35 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               {tab === "signup" && (
                 <>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      autoComplete="name"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-700"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                        First name
+                      </label>
+                      <input
+                        type="text"
+                        autoComplete="given-name"
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="First"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                        Last name
+                      </label>
+                      <input
+                        type="text"
+                        autoComplete="family-name"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Last"
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-700"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -299,7 +352,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (tab === "signup" && !acceptedDisclaimer)}
                 className="mt-1 w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 {loading
