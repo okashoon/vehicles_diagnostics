@@ -27,12 +27,10 @@ export default function HomeV3() {
           <p className="mb-4 text-xs tracking-[0.3em] text-[#00ff41]/60">
             // SYSTEM STATUS: ONLINE
           </p>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight text-[#00ff41]">
-            CRASH_PULSE
-          </h1>
-          <p className="mt-1 text-lg font-bold tracking-widest text-[#00cc33]">
-            TECHNOLOGIES
-          </p>
+          <img
+            src="/crash_pulse_logo_large.png"
+            alt="Crash Pulse Technologies"
+          />
           <div className="mt-6 border border-[#00ff41]/30 bg-[#00ff41]/5 p-4 text-left text-sm text-[#00cc33] leading-relaxed max-w-2xl mx-auto">
             <span className="text-[#00ff41]">&gt; </span>
             The legacy tools were discontinued. The forensic engineering community was left without
@@ -99,6 +97,16 @@ export default function HomeV3() {
                 alt="Validation — SAE Published"
                 className="w-full border border-[#00ff41]/20"
               />
+              <img
+                src="/retrieval_legacy.jpeg"
+                alt="Crash Data Retrieval from Legacy Vehicles: Overview and Validation of a Functionally Equivalent Vehicle Communication Interface (CDX)"
+                className="w-full border border-[#00ff41]/20"
+              />
+              <div className="space-y-3 pt-2">
+                <p className="text-sm text-[#00cc33] leading-relaxed">
+                  Published in the Accident Reconstruction Journal, Vol. 36, No. 4 (July/August 2026): <i>“Crash Data Retrieval from Legacy Vehicles: Overview and Validation of a Functionally Equivalent Vehicle Communication Interface (CDX)”</i>
+                </p>
+              </div>
               <img
                 src="/summit.jpeg"
                 alt="2026 EDR Summit — Houston"

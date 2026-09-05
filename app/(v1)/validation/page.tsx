@@ -9,6 +9,7 @@ export default function ValidationV3() {
           className="w-full border border-[#00ff41]/20"
         />
 
+
         {/* SAE paper link */}
         <div className="border border-[#00ff41]/40 bg-[#00ff41]/5 p-5 flex items-start gap-3">
           <span className="text-[#00ff41] shrink-0 text-xs mt-0.5">&gt;</span>
@@ -21,6 +22,17 @@ export default function ValidationV3() {
             SAE 2026-01-5009 – Validation of a Legacy-Compatible Vehicle Communication Interface
             for the Retrieval of Crash Data from Passenger Vehicles ↗
           </a>
+        </div>
+        
+        <img
+          src="/retrieval_legacy.jpeg"
+          alt="Crash Data Retrieval from Legacy Vehicles: Overview and Validation of a Functionally Equivalent Vehicle Communication Interface (CDX)"
+          className="w-full border border-[#00ff41]/20"
+        />
+        <div className="space-y-3 pt-2">
+          <p className="text-sm text-[#00cc33] leading-relaxed">
+            Published in the Accident Reconstruction Journal, Vol. 36, No. 4 (July/August 2026): <i>“Crash Data Retrieval from Legacy Vehicles: Overview and Validation of a Functionally Equivalent Vehicle Communication Interface (CDX)”</i>
+          </p>
         </div>
 
         <div>

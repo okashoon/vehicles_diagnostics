@@ -109,14 +109,27 @@ export function NavBarV3() {
             ) : null}
           </div>
 
-          {/* Mobile hamburger */}
-          <button
-            className="lg:hidden p-2 font-mono text-[#00cc33] hover:text-[#00ff41]"
-            onClick={() => setMobileOpen((v) => !v)}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? "[X]" : "[=]"}
-          </button>
+          {/* Mobile: lookup stays visible next to the hamburger */}
+          <div className="flex lg:hidden items-center gap-1 shrink-0">
+            <Link
+              href="/lookup"
+              className={[
+                "px-2.5 py-1 font-mono text-[10px] tracking-widest transition-colors",
+                pathname === "/lookup"
+                  ? "text-[#0a0a0a] bg-[#00ff41]"
+                  : "text-[#00cc33] hover:text-[#00ff41] hover:bg-[#00ff41]/10",
+              ].join(" ")}
+            >
+              {pathname === "/lookup" ? "[VEHICLE LOOKUP]" : "VEHICLE LOOKUP"}
+            </Link>
+            <button
+              className="p-2 font-mono text-[#00cc33] hover:text-[#00ff41]"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? "[X]" : "[=]"}
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu */}

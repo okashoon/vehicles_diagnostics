@@ -81,3 +81,14 @@ CREATE TABLE IF NOT EXISTS cable_aliases (
 ALTER TABLE cable_aliases ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'obd';
 DROP INDEX IF EXISTS cable_aliases_raw_name_uq;
 CREATE UNIQUE INDEX IF NOT EXISTS cable_aliases_kind_raw_name_uq ON cable_aliases (kind, raw_name);
+
+-- Contact form submissions. Email via Resend is a notification; this is the record.
+CREATE TABLE IF NOT EXISTS contacts (
+  id         SERIAL PRIMARY KEY,
+  first_name TEXT        NOT NULL,
+  last_name  TEXT        NOT NULL,
+  email      TEXT        NOT NULL,
+  phone      TEXT,
+  message    TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

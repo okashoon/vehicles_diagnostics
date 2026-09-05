@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import pool from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { Resend } from "resend";
 import { getVehicles } from "@/lib/vehicles";
 import { getLookupColumnConfig } from "@/lib/lookup-columns";
 import { AdminDataTab } from "./AdminDataTab";
@@ -50,26 +49,26 @@ function formatDate(iso: string | null) {
   });
 }
 
-interface ContactEmail {
-  id: string;
-  subject: string;
-  to: string[] | null;
-  reply_to: string[] | null;
+interface ContactRow {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  message: string | null;
   created_at: string;
-  sent_at: string | null;
-  status: string;
 }
 
-async function getContactEmails(): Promise<ContactEmail[]> {
-  if (!process.env.RESEND_API_KEY) return [];
+async function getContacts(): Promise<ContactRow[]> {
   try {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const { data, error } = await resend.emails.list();
-    if (error || !data) return [];
-    return (data.data as unknown as ContactEmail[]).filter(e =>
-      e.subject?.startsWith("New contact from") && !e.reply_to?.[0]?.includes("okashoon") &&!e.reply_to?.[0]?.includes("a.okasha")
+    const { rows } = await pool.query<ContactRow>(
+      `SELECT id, first_name, last_name, email, phone, message, created_at
+       FROM contacts
+       ORDER BY created_at DESC`
     );
-  } catch {
+    return rows;
+  } catch (err) {
+    console.error("[admin] failed to load contacts:", err);
     return [];
   }
 }
@@ -110,9 +109,9 @@ export default async function AdminPage({
     : null) as Filter;
   const page = Math.max(1, Number(rawPage) || 1);
 
-  const [allUsers, contactEmails, vehicleResult, columnConfig, cables] = await Promise.all([
+  const [allUsers, contacts, vehicleResult, columnConfig, cables] = await Promise.all([
     tab === "users" ? getAllUsers() : Promise.resolve([] as UserRow[]),
-    tab === "users" ? getContactEmails() : Promise.resolve([] as ContactEmail[]),
+    tab === "users" ? getContacts() : Promise.resolve([] as ContactRow[]),
     tab === "data" ? getVehicles({}, page, PER_PAGE) : Promise.resolve({ rows: [], total: 0 }),
     tab === "data" ? getLookupColumnConfig() : Promise.resolve([]),
     tab === "cables" ? getCables() : Promise.resolve([] as CableRecord[]),
@@ -332,45 +331,47 @@ export default async function AdminPage({
 
             {/* Contact messages */}
             <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="px-5 py-4 border-b border-gray-800">
                 <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-                  Contact Messages ({contactEmails.length})
+                  Contact Messages ({contacts.length})
                 </h2>
-                <a
-                  href="https://resend.com/emails"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                >
-                  View in Resend ↗
-                </a>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                      <th className="px-5 py-3 text-left">From</th>
-                      <th className="px-5 py-3 text-left">Subject</th>
-                      <th className="px-5 py-3 text-left">Sent</th>
+                      <th className="px-5 py-3 text-left">Name</th>
+                      <th className="px-5 py-3 text-left">Email</th>
+                      <th className="px-5 py-3 text-left">Phone</th>
+                      <th className="px-5 py-3 text-left">Message</th>
+                      <th className="px-5 py-3 text-left">Received</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800/60">
-                    {contactEmails.map(email => (
-                      <tr key={email.id} className="hover:bg-gray-800/40 transition-colors">
-                        <td className="px-5 py-3 text-gray-300 text-xs font-mono">
-                          {email.reply_to?.[0] ?? "—"}
+                    {contacts.map((c) => (
+                      <tr key={c.id} className="hover:bg-gray-800/40 transition-colors align-top">
+                        <td className="px-5 py-3 text-gray-100 whitespace-nowrap">
+                          {c.first_name} {c.last_name}
                         </td>
-                        <td className="px-5 py-3 text-gray-100 text-sm">
-                          {email.subject}
+                        <td className="px-5 py-3 text-gray-300 text-xs font-mono">
+                          <a href={`mailto:${c.email}`} className="hover:text-white">
+                            {c.email}
+                          </a>
                         </td>
                         <td className="px-5 py-3 text-gray-400 text-xs">
-                          {formatDate(email.sent_at ?? email.created_at)}
+                          {c.phone ?? <span className="text-gray-600 italic">—</span>}
+                        </td>
+                        <td className="px-5 py-3 text-gray-300 text-sm max-w-md whitespace-pre-wrap">
+                          {c.message ?? <span className="text-gray-600 italic">—</span>}
+                        </td>
+                        <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">
+                          {formatDate(c.created_at)}
                         </td>
                       </tr>
                     ))}
-                    {contactEmails.length === 0 && (
+                    {contacts.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-5 py-10 text-center text-gray-600">
+                        <td colSpan={5} className="px-5 py-10 text-center text-gray-600">
                           No contact messages yet.
                         </td>
                       </tr>
